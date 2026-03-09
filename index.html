@@ -679,7 +679,7 @@ window.addEventListener('DOMContentLoaded', () => {
         ['blocks','analyses','algorithms','expressions','groups'].forEach(k=>{if(!Array.isArray(cloud[k]))cloud[k]=[];});
         const cloudCount = ['blocks','analyses','algorithms','expressions'].reduce((a,k)=>a+cloud[k].length,0);
         const localCount = ['blocks','analyses','algorithms','expressions'].reduce((a,k)=>a+(S[k]||[]).length,0);
-        if (cloudCount >= localCount) { S = cloud; render(); updateStats(); }
+        if (cloudCount >= localCount) { S = cloud; updateStats(); if(typeof curPage!=='undefined')goPage(curPage); }
         setSyncStatus('☁️ 동기화됨 ✓', '#79b877');
       } else { setSyncStatus('로컬 모드', '#888'); }
     });
@@ -816,7 +816,7 @@ function saveToken_kans4() {
   document.getElementById('kans4-token-modal').remove();
   setSyncStatus('토큰 저장됨, 동기화 중...', '#79b877');
   loadFromCloud_kans4().then(cloud => {
-    if (cloud) { S = cloud; ['blocks','analyses','algorithms','expressions','groups'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[];}); render(); updateStats(); setSyncStatus('☁️ 동기화됨 ✓', '#79b877'); }
+    if (cloud) { S = cloud; ['blocks','analyses','algorithms','expressions','groups'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[];}); updateStats(); if(typeof curPage!=='undefined')goPage(curPage); setSyncStatus('☁️ 동기화됨 ✓', '#79b877'); }
   });
 }
 // ─────────────────────────────────────────────────────
