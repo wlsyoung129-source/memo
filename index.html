@@ -1321,14 +1321,51 @@ function viewAlgo(id){
 function openStepLinker(algoId,si){
   const a=S.algorithms.find(x=>x.id===algoId);if(!a)return;
   const s=a.steps[si];
+  const renderLinkerBlocks=()=>{
+    const chkEl=document.getElementById('step-block-chk');if(!chkEl)return;
+    const q=(document.getElementById('step-linker-search')?.value||'').trim().toLowerCase();
+    const filtered=S.blocks.filter(b=>!q||b.content.toLowerCase().includes(q)||b.type.toLowerCase().includes(q));
+    chkEl.innerHTML=filtered.length
+      ?filtered.map(b=>`<div class="chk-item"><input type="checkbox" id="sbc-${b.id}" value="${b.id}" style="accent-color:var(--acc2)"${(s.blockIds||[]).includes(b.id)?' checked':''}><label for="sbc-${b.id}">${esc(b.content.slice(0,48))}<br><span style="font-size:11px;color:var(--txt3)">${b.type}</span></label></div>`).join('')
+      :`<div style="color:var(--txt3);font-size:13px;padding:8px 0">블록 없음</div>`;
+  };
   document.getElementById('modal-algo-body').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div class="modal-title" style="font-size:17px;margin-bottom:0">${esc(a.title)} — ${s.order}단계</div>
       <div class="modal-close" onclick="viewAlgo('${algoId}')">✕</div>
     </div>
     <div style="font-size:14px;color:var(--txt2);margin-bottom:14px">${esc(s.title)}</div>
-    <div id="step-block-chk">${S.blocks.map(b=>`<div class="chk-item"><input type="checkbox" id="sbc-${b.id}" value="${b.id}" style="accent-color:var(--acc2)"${(s.blockIds||[]).includes(b.id)?' checked':''}><label for="sbc-${b.id}">${esc(b.content.slice(0,48))}<br><span style="font-size:11px;color:var(--txt3)">${b.type}</span></label></div>`).join('')}</div>
-    <div class="row" style="margin-top:14px"><button class="btn btn-p" onclick="saveStepBlocks('${algoId}',${si})">저장</button><button class="btn btn-g" onclick="viewAlgo('${algoId}')">취소</button></div>`;
+    <input id="step-linker-search" type="text" placeholder="🔍 블록 검색..." style="width:100%;box-sizing:border-box;margin-bottom:10px;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--bdr);background:var(--sur3);color:var(--txt1);" oninput="(()=>{const q=this.value.trim().toLowerCase();const chkEl=document.getElementById('step-block-chk');if(!chkEl)return;const filtered=S.blocks.filter(b=>!q||b.content.toLowerCase().includes(q)||b.type.toLowerCase().includes(q));chkEl.innerHTML=filtered.length?filtered.map(b=>\`<div class='chk-item'><input type='checkbox' id='sbc-\${b.id}' value='\${b.id}' style='accent-color:var(--acc2)'\${(a.steps[${si}].blockIds||[]).includes(b.id)?' checked':''}><label for='sbc-\${b.id}'>\${esc(b.content.slice(0,48))}<br><span style='font-size:11px;color:var(--txt3)'>\${b.type}</span></label></div>\`).join(''):'<div style=\'color:var(--txt3);font-size:13px;padding:8px 0\'>블록 없음</div>';})()">
+    <div id="step-block-chk" style="max-height:220px;overflow-y:auto;margin-bottom:12px">${S.blocks.map(b=>`<div class="chk-item"><input type="checkbox" id="sbc-${b.id}" value="${b.id}" style="accent-color:var(--acc2)"${(s.blockIds||[]).includes(b.id)?' checked':''}><label for="sbc-${b.id}">${esc(b.content.slice(0,48))}<br><span style="font-size:11px;color:var(--txt3)">${b.type}</span></label></div>`).join('')}</div>
+    <div style="border-top:1px solid var(--bdr);padding-top:12px;margin-bottom:12px">
+      <div style="font-size:12px;color:var(--txt3);margin-bottom:7px;font-weight:600;letter-spacing:.04em">＋ 새 블록 생성 후 연결</div>
+      <select id="step-new-block-type" style="font-size:12px;padding:5px 8px;border-radius:7px;border:1px solid var(--bdr);background:var(--sur3);color:var(--txt1);margin-bottom:6px">
+        <option value="관찰">관찰</option><option value="공부" selected>공부</option><option value="강의">강의</option><option value="경험">경험</option>
+      </select>
+      <div style="display:flex;gap:6px">
+        <input id="step-new-block-content" type="text" placeholder="새 블록 내용 입력..." style="flex:1;font-size:13px;padding:6px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--sur3);color:var(--txt1);"
+          onkeydown="if(event.key==='Enter')createBlockInLinker('${algoId}',${si})">
+        <button class="btn btn-g btn-sm" style="color:var(--acc3);border-color:rgba(63,255,162,.3);white-space:nowrap" onclick="createBlockInLinker('${algoId}',${si})">생성 & 연결</button>
+      </div>
+    </div>
+    <div class="row"><button class="btn btn-p" onclick="saveStepBlocks('${algoId}',${si})">저장</button><button class="btn btn-g" onclick="viewAlgo('${algoId}')">취소</button></div>`;
+}
+function createBlockInLinker(algoId,si){
+  const contentEl=document.getElementById('step-new-block-content');
+  const typeEl=document.getElementById('step-new-block-type');
+  const content=(contentEl?.value||'').trim();
+  if(!content){contentEl&&contentEl.focus();return;}
+  const type=typeEl?.value||'공부';
+  const newBlock={id:uid(),type,content,tags:[],group:'',source:'',created:new Date().toISOString()};
+  S.blocks.push(newBlock);persist();
+  // 체크박스 목록에 추가 후 체크
+  const chkEl=document.getElementById('step-block-chk');
+  if(chkEl){
+    const div=document.createElement('div');div.className='chk-item';
+    div.innerHTML=`<input type="checkbox" id="sbc-${newBlock.id}" value="${newBlock.id}" checked style="accent-color:var(--acc2)"><label for="sbc-${newBlock.id}">${esc(newBlock.content.slice(0,48))}<br><span style="font-size:11px;color:var(--txt3)">${newBlock.type}</span></label>`;
+    chkEl.insertBefore(div,chkEl.firstChild);
+  }
+  contentEl.value='';contentEl.focus();
 }
 function saveStepBlocks(algoId,si){
   const a=S.algorithms.find(x=>x.id===algoId);if(!a)return;
