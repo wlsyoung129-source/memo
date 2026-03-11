@@ -226,10 +226,11 @@ select:hover{border-color:var(--bdr2);}
 .zoom-display{font-family:'DM Mono',monospace;font-size:12px;color:var(--txt3);padding:4px 8px;background:var(--sur2);border-radius:6px;border:1px solid var(--bdr);}
 #gcanvas{flex:1;display:block;touch-action:none;cursor:grab;width:100%;}
 #gcanvas.grabbing{cursor:grabbing;}
-.graph-legend{display:flex;flex-wrap:wrap;gap:6px 10px;padding:8px 12px;background:var(--sur);border-top:1px solid var(--bdr);overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.graph-legend{display:flex;flex-wrap:wrap;gap:6px 10px;padding:8px 12px;background:var(--sur);border-top:1px solid var(--bdr);overflow-x:auto;-webkit-overflow-scrolling:touch;transition:all .2s;}
 .gl-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--txt2);}
 .gl-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
-#ginfo-panel{padding:12px 16px;background:var(--sur2);border-top:2px solid var(--bdr2);font-size:13px;color:var(--txt2);display:none;flex-direction:column;max-height:min(200px,35vh);overflow-y:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;}
+#ginfo-panel{padding:12px 16px;background:var(--sur2);border-top:2px solid var(--bdr2);font-size:13px;color:var(--txt2);display:none;flex-direction:column;max-height:min(200px,35vh);overflow-y:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;animation:panelSlideUp .18s cubic-bezier(.32,.72,0,1);}
+@keyframes panelSlideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
 /* ── HOME ── */
 .home-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:20px;}
@@ -396,6 +397,11 @@ select:hover{border-color:var(--bdr2);}
             <div class="flow-s">Algorithm</div><div class="flow-a">→</div>
             <div class="flow-s">Expression</div>
           </div>
+          <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+            <button class="btn btn-p btn-sm" onclick="goPage('memo',document.querySelector('[data-page=memo]'))" style="font-size:12px">＋ 새 Block</button>
+            <button class="btn btn-g btn-sm" onclick="goPage('algorithm',document.querySelector('[data-page=algorithm]'))" style="font-size:12px">⚙ 알고리즘 만들기</button>
+            <button class="btn btn-g btn-sm" onclick="goPage('graph',document.querySelector('[data-page=graph]'))" style="font-size:12px">⬡ 그래프 보기</button>
+          </div>
         </div>
         <div class="home-panel">
           <div class="home-panel-title">최근 Blocks</div>
@@ -560,52 +566,61 @@ select:hover{border-color:var(--bdr2);}
   <!-- GRAPH (flex child, separate) -->
   <div class="graph-page" id="page-graph">
     <div class="graph-toolbar">
-      <button class="btn btn-g btn-sm" onclick="graphCenter()">⊹ 중앙</button>
-      <button class="btn btn-g btn-sm" onclick="graphZoomIn()">＋</button>
-      <button class="btn btn-g btn-sm" onclick="graphZoomOut()">－</button>
-      <button class="btn btn-g btn-sm" onclick="graphReset()">↺ 재배치</button>
-      <div class="zoom-display" id="zoom-label">100%</div>
-      <div style="width:1px;height:20px;background:var(--bdr);margin:0 4px"></div>
-      <!-- 인터랙션 모드 -->
-      <div class="pill-row" style="margin:0;gap:3px">
-        <div class="pill on btn-sm gmode-btn" id="gmode-move" style="padding:5px 10px;font-size:11px" onclick="setGraphMode('move',this)">✥ 이동</div>
-        <div class="pill btn-sm gmode-btn" id="gmode-connect" style="padding:5px 10px;font-size:11px;color:var(--acc3)" onclick="setGraphMode('connect',this)">⟶ 연결</div>
-        <div class="pill btn-sm gmode-btn" id="gmode-cut" style="padding:5px 10px;font-size:11px;color:var(--red)" onclick="setGraphMode('cut',this)">✂ 끊기</div>
-      </div>
-      <div style="width:1px;height:20px;background:var(--bdr);margin:0 4px"></div>
-      <!-- 뷰 전환 -->
-      <div class="pill-row" style="margin:0;gap:3px">
+      <!-- 뷰 컨트롤 -->
+      <div style="display:flex;align-items:center;gap:3px">
+        <span style="font-size:9px;font-family:DM Mono,monospace;color:var(--txt3);letter-spacing:.5px;margin-right:2px">VIEW</span>
         <div class="pill on btn-sm gview-btn" id="gview-graph" style="padding:5px 10px;font-size:11px" onclick="setGraphView('graph',this)">◎ 그래프</div>
         <div class="pill btn-sm gview-btn" id="gview-nested" style="padding:5px 10px;font-size:11px" onclick="setGraphView('nested',this)">⊞ 집합</div>
         <div class="pill btn-sm gview-btn" id="gview-rumsfeld" style="padding:5px 10px;font-size:11px" onclick="setGraphView('rumsfeld',this)">⊏ 럼즈펠드</div>
       </div>
-      <div style="width:1px;height:20px;background:var(--bdr);margin:0 4px"></div>
+      <div style="width:1px;height:20px;background:var(--bdr);margin:0 2px"></div>
+      <!-- 인터랙션 모드 -->
+      <div style="display:flex;align-items:center;gap:3px">
+        <span style="font-size:9px;font-family:DM Mono,monospace;color:var(--txt3);letter-spacing:.5px;margin-right:2px">MODE</span>
+        <div class="pill on btn-sm gmode-btn" id="gmode-move" style="padding:5px 10px;font-size:11px" onclick="setGraphMode('move',this)" title="노드 드래그 이동 | 더블클릭으로 접기/펼치기">✥ 이동</div>
+        <div class="pill btn-sm gmode-btn" id="gmode-connect" style="padding:5px 10px;font-size:11px;color:var(--acc3)" onclick="setGraphMode('connect',this)" title="노드→노드 클릭으로 연결">⟶ 연결</div>
+        <div class="pill btn-sm gmode-btn" id="gmode-cut" style="padding:5px 10px;font-size:11px;color:var(--red)" onclick="setGraphMode('cut',this)" title="엣지 클릭으로 연결 끊기">✂ 끊기</div>
+      </div>
+      <div style="width:1px;height:20px;background:var(--bdr);margin:0 2px"></div>
+      <!-- 캔버스 컨트롤 -->
+      <div style="display:flex;align-items:center;gap:3px">
+        <button class="btn btn-g btn-sm" onclick="graphCenter()" title="중앙 정렬">⊹</button>
+        <button class="btn btn-g btn-sm" onclick="graphZoomIn()" title="확대">＋</button>
+        <div class="zoom-display" id="zoom-label">100%</div>
+        <button class="btn btn-g btn-sm" onclick="graphZoomOut()" title="축소">－</button>
+        <button class="btn btn-g btn-sm" onclick="graphReset()" title="재배치">↺</button>
+      </div>
+      <div style="width:1px;height:20px;background:var(--bdr);margin:0 2px"></div>
       <!-- 접기/펼치기 -->
-      <div class="pill-row" style="margin:0;gap:3px">
-        <div class="pill btn-sm" style="padding:5px 10px;font-size:11px;color:var(--acc3)" onclick="collapseAllAlgos()">⊟ 전체접기</div>
-        <div class="pill btn-sm" style="padding:5px 10px;font-size:11px" onclick="expandAllAlgos()">⊞ 전체펼치기</div>
+      <div style="display:flex;align-items:center;gap:3px">
+        <span style="font-size:9px;font-family:DM Mono,monospace;color:var(--txt3);letter-spacing:.5px;margin-right:2px">FOLD</span>
+        <div class="pill btn-sm" style="padding:5px 10px;font-size:11px;color:var(--acc3)" onclick="collapseAllAlgos()" title="모든 노드 접기">⊟ 전체</div>
+        <div class="pill btn-sm" style="padding:5px 10px;font-size:11px" onclick="expandAllAlgos()" title="모든 노드 펼치기">⊞ 전체</div>
       </div>
       <div style="flex:1"></div>
+      <!-- 필터 + 레전드 -->
       <div class="pill-row" id="graph-filter" style="margin:0;gap:3px">
         <div class="pill on btn-sm" style="padding:5px 10px;font-size:11px" onclick="setGraphFilter(this,'all')">전체</div>
         <div class="pill btn-sm" style="padding:5px 10px;font-size:11px" onclick="setGraphFilter(this,'block')">Block</div>
         <div class="pill btn-sm" style="padding:5px 10px;font-size:11px" onclick="setGraphFilter(this,'algo')">Algo</div>
       </div>
+      <button class="btn btn-g btn-sm" onclick="toggleLegend()" id="legend-toggle-btn" style="font-size:11px;padding:5px 10px" title="범례 보기/숨기기">? 범례</button>
     </div>
     <!-- 모드 힌트 바 -->
     <div id="gmode-hint" style="display:none;padding:5px 16px;font-size:11px;font-family:'DM Mono',monospace;background:rgba(212,168,83,.07);border-bottom:1px solid var(--bdr);color:var(--acc)"></div>
     <canvas id="gcanvas" style="display:block;flex:1;min-height:0"></canvas>
     <!-- 럼즈펠드 뷰 -->
     <div id="grumsfeld" style="display:none;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:20px"></div>
-    <div id="ginfo-panel">노드를 클릭하면 정보가 표시돼요</div>
+    <div id="ginfo-panel" style="display:none"></div>
     <div id="ai-connect-result" style="display:none;padding:0 16px 10px;background:var(--sur)"></div>
-    <div class="graph-legend">
-      <div class="gl-item"><div class="gl-dot" style="background:#d4a853"></div>Block</div>
-      <div class="gl-item"><div class="gl-dot" style="background:var(--acc);border:2px solid rgba(255,255,255,.3)"></div>Algorithm <span style="font-size:9px;color:var(--txt3)">(색상별 구분)</span></div>
-      <div class="gl-item"><svg width="10" height="10" style="flex-shrink:0"><polygon points="5,0 10,5 5,10 0,5" fill="#e07060" stroke="rgba(255,255,255,.3)" stroke-width="1"/></svg>Step <span style="font-size:9px;color:var(--txt3)">(같은 색 = 같은 알고리즘)</span></div>
-      <div class="gl-item"><div class="gl-dot" style="background:rgba(212,168,83,.4);border:1.5px solid #d4a853"></div>B↔B 연결</div>
-      <div class="gl-item" style="gap:5px"><div style="width:18px;height:2px;background:rgba(121,184,119,.7);border-radius:1px;flex-shrink:0"></div>A→A</div>
-      <div class="gl-item" style="gap:5px"><div style="width:18px;height:2px;background:#e07060;border-radius:1px;flex-shrink:0"></div>A→Step→B <span style="font-size:9px;color:var(--txt3)">(알고리즘 색)</span></div>
+    <div class="graph-legend" id="graph-legend-bar" style="display:none">
+      <div class="gl-item"><div class="gl-dot" style="background:#d4a853"></div>Block ⬤</div>
+      <div class="gl-item"><div class="gl-dot" style="background:var(--acc);border:2px solid rgba(255,255,255,.3)"></div>Algorithm ⬤ <span style="font-size:9px;color:var(--txt3)">(색상별 구분)</span></div>
+      <div class="gl-item"><svg width="10" height="10" style="flex-shrink:0"><polygon points="5,0 10,5 5,10 0,5" fill="#e07060" stroke="rgba(255,255,255,.3)" stroke-width="1"/></svg>Step ◆ <span style="font-size:9px;color:var(--txt3)">(같은 색 = 같은 알고리즘)</span></div>
+      <div class="gl-item"><div class="gl-dot" style="background:rgba(212,168,83,.4);border:1.5px solid #d4a853"></div>B↔B 링크</div>
+      <div class="gl-item" style="gap:5px"><div style="width:18px;height:2px;background:rgba(121,184,119,.7);border-radius:1px;flex-shrink:0"></div>A→A 연결</div>
+      <div class="gl-item" style="gap:5px"><div style="width:18px;height:2px;background:#e07060;border-radius:1px;flex-shrink:0"></div>A→Step→B</div>
+      <div class="gl-item" style="color:var(--txt3)">더블클릭 = 접기/펼치기</div>
     </div>
   </div>
 </div><!-- /main-area -->
@@ -950,11 +965,46 @@ function fabAction(){
 function renderHome(){
   updateStats();
   const hb=document.getElementById('home-blocks');
-  hb.innerHTML=!S.blocks.length?'<div class="empty">아직 Block이 없어요</div>'
-    :S.blocks.slice(-6).reverse().map(b=>blockItemHTML(b)).join('');
+  if(!S.blocks.length){
+    hb.innerHTML=`<div style="text-align:center;padding:24px 16px">
+      <div style="font-size:28px;margin-bottom:8px;opacity:.3">✎</div>
+      <div style="font-size:13px;color:var(--txt3);margin-bottom:12px">아직 Block이 없어요</div>
+      <button class="btn btn-p btn-sm" onclick="goPage('memo',document.querySelector('[data-page=memo]'))">＋ 첫 Block 만들기</button>
+    </div>`;
+  } else {
+    hb.innerHTML=S.blocks.slice(-5).reverse().map(b=>{
+      const g=S.groups.find(x=>x.id===b.groupId);
+      return `<div class="bi" onclick="viewBlock('${b.id}')">
+        <div class="bi-content">${esc(b.content)}</div>
+        <div class="bi-footer">
+          <span class="btype ${b.type}">${b.type}</span>
+          ${g?`<span style="font-size:10px;font-family:DM Mono,monospace;color:${g.color}">${esc(g.name)}</span>`:''}
+          <span class="bdate">${fd(b.created)}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
   const ha=document.getElementById('home-algos');
-  ha.innerHTML=!S.algorithms.length?'<div class="empty">아직 Algorithm이 없어요</div>'
-    :S.algorithms.slice(-4).reverse().map(a=>`<div class="card" onclick="viewAlgo('${a.id}')"><div class="card-title">${esc(a.title)}</div><div class="card-sub">${a.steps.length}단계</div><div class="card-tags">${(a.tags||[]).map(t=>`<span class="tag ac">${esc(t)}</span>`).join('')}</div></div>`).join('');
+  if(!S.algorithms.length){
+    ha.innerHTML=`<div style="text-align:center;padding:24px 16px">
+      <div style="font-size:28px;margin-bottom:8px;opacity:.3">⚙</div>
+      <div style="font-size:13px;color:var(--txt3);margin-bottom:12px">아직 Algorithm이 없어요</div>
+      <button class="btn btn-g btn-sm" onclick="goPage('algorithm',document.querySelector('[data-page=algorithm]'))">⚙ 알고리즘 만들기</button>
+    </div>`;
+  } else {
+    ha.innerHTML=S.algorithms.slice(-4).reverse().map(a=>{
+      const connectedBlocks=[...new Set(a.steps.flatMap(s=>s.blockIds||[]))].length;
+      return `<div class="card" onclick="viewAlgo('${a.id}')">
+        <div class="card-title">${esc(a.title)}</div>
+        <div class="card-sub" style="display:flex;gap:10px;align-items:center">
+          <span>${a.steps.length}단계</span>
+          <span style="color:var(--txt3)">·</span>
+          <span>${connectedBlocks}개 Block 연결</span>
+        </div>
+        <div class="card-tags">${(a.tags||[]).map(t=>`<span class="tag ac">${esc(t)}</span>`).join('')}</div>
+      </div>`;
+    }).join('');
+  }
 }
 
 /* ── MEMO ── */
@@ -1487,18 +1537,25 @@ let gViewMode='graph'; // 'graph' | 'nested' | 'rumsfeld'
 let gConnectSrc=null;
 let gHoverEdge=null;
 
+function toggleLegend(){
+  const bar=document.getElementById('graph-legend-bar');
+  const btn=document.getElementById('legend-toggle-btn');
+  if(!bar)return;
+  const isVisible=bar.style.display!=='none';
+  bar.style.display=isVisible?'none':'flex';
+  if(btn){btn.style.background=isVisible?'':'rgba(212,168,83,.12)';btn.style.color=isVisible?'':'var(--acc)';}
+}
 function setGraphMode(mode, el){
   gMode=mode;
   document.querySelectorAll('.gmode-btn').forEach(b=>b.classList.remove('on'));
   el.classList.add('on');
   const hint=document.getElementById('gmode-hint');
   const msgs={
-    move:'✥ 이동 모드 — 드래그로 이동 | 노드 더블클릭(더블탭)으로 ⊟접기/⊞펼치기 (알고리즘⬤·블록⬤·스텝◆)',
-    connect:'⟶ 연결 모드 — 노드에서 다른 노드로 드래그해서 연결하세요',
-    cut:'✂ 끊기 모드 — 연결선 위를 클릭하면 연결이 끊어집니다'
+    move:'✥ 이동 — 드래그: 노드 이동 | 더블클릭: ⊟접기/⊞펼치기 | 스크롤: 줌 | 빈 공간 드래그: 팬',
+    connect:'⟶ 연결 — 노드 클릭 후 다른 노드 클릭으로 연결 (Block↔Block, Algo↔Algo)',
+    cut:'✂ 끊기 — 연결선(엣지) 위를 클릭하면 연결이 끊어집니다'
   };
-  if(mode==='move'){hint.style.display='none';}
-  else{hint.style.display='block';hint.textContent=msgs[mode];}
+  hint.style.display='block';hint.textContent=msgs[mode];
   gConnectSrc=null;
 }
 function setGraphView(view, el){
@@ -1508,7 +1565,7 @@ function setGraphView(view, el){
   const canvas=document.getElementById('gcanvas');
   const rumsfeld=document.getElementById('grumsfeld');
   const info=document.getElementById('ginfo-panel');
-  const legend=document.querySelector('.graph-legend');
+  // legend handled separately
   const aiRes=document.getElementById('ai-connect-result');
   const hint=document.getElementById('gmode-hint');
   const pageGraph=document.getElementById('page-graph');
@@ -1516,9 +1573,9 @@ function setGraphView(view, el){
   const cw=document.getElementById('content-wrap');
   const isGraph=view==='graph';
   if(info) info.style.display=isGraph?'':'none';
-  if(legend) legend.style.display=isGraph?'':'none';
+  // legend bar는 toggleLegend()로 별도 관리
   if(aiRes) aiRes.style.display='none';
-  if(hint) hint.style.display=isGraph&&gMode!=='move'?'block':'none';
+  if(hint) hint.style.display=isGraph?'block':'none';
   if(view==='graph'){
     if(pageNested) pageNested.classList.remove('on');
     pageGraph.classList.add('on');
@@ -2115,7 +2172,7 @@ function renderGraph(){
       gCollapsed[a.id]=true;
       a.steps.forEach((s,si)=>{gCollapsed['step_'+a.id+'_'+si]=true;});
     });
-    S.blocks.forEach(b=>{gCollapsed[b.id]=true;});
+    // block은 기본 펼침 — 접기는 bb 링크 엣지만 숨기는 것
     buildGraphData();
     // 노드 초기 위치를 화면 중심 기준으로 재조정
     gNodes.forEach(n=>{n.x+=gOffX-gW/2;n.y+=gOffY-gH/2;});
@@ -2130,6 +2187,15 @@ function runGraphLoop(cv){
     rafId=requestAnimationFrame(frame);
     if(cv.clientWidth>0&&gW>0&&(gW!==cv.clientWidth||gH!==cv.clientHeight))resizeCanvas(cv);
     ctx.clearRect(0,0,gW,gH);
+    // 빈 상태 안내
+    if(gNodes.length===0){
+      ctx.save();
+      ctx.font=`700 15px Noto Sans KR,sans-serif`;ctx.fillStyle='rgba(255,255,255,.15)';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('아직 데이터가 없어요',gW/2,gH/2-20);
+      ctx.font=`400 12px DM Mono,monospace`;ctx.fillStyle='rgba(255,255,255,.08)';
+      ctx.fillText('Memo 탭에서 Block을 추가하고 Algorithm을 만들어보세요',gW/2,gH/2+10);
+      ctx.restore();return;
+    }
     if(physicsOn()&&gPhysicsTick<300){
       // 노드 수에 따라 damping 강화 — 많을수록 빨리 안정화
       const damp=Math.max(0.68, 0.82 - gNodes.length * 0.005);
