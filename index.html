@@ -579,6 +579,12 @@ select:hover{border-color:var(--bdr2);}
         <div class="pill btn-sm gview-btn" id="gview-nested" style="padding:5px 10px;font-size:11px" onclick="setGraphView('nested',this)">⊞ 집합</div>
         <div class="pill btn-sm gview-btn" id="gview-rumsfeld" style="padding:5px 10px;font-size:11px" onclick="setGraphView('rumsfeld',this)">⊏ 럼즈펠드</div>
       </div>
+      <div style="width:1px;height:20px;background:var(--bdr);margin:0 4px"></div>
+      <!-- 접기/펼치기 -->
+      <div class="pill-row" style="margin:0;gap:3px">
+        <div class="pill btn-sm" style="padding:5px 10px;font-size:11px;color:var(--acc3)" onclick="collapseAllAlgos()">⊟ 전체접기</div>
+        <div class="pill btn-sm" style="padding:5px 10px;font-size:11px" onclick="expandAllAlgos()">⊞ 전체펼치기</div>
+      </div>
       <div style="flex:1"></div>
       <div class="pill-row" id="graph-filter" style="margin:0;gap:3px">
         <div class="pill on btn-sm" style="padding:5px 10px;font-size:11px" onclick="setGraphFilter(this,'all')">전체</div>
@@ -595,12 +601,11 @@ select:hover{border-color:var(--bdr2);}
     <div id="ai-connect-result" style="display:none;padding:0 16px 10px;background:var(--sur)"></div>
     <div class="graph-legend">
       <div class="gl-item"><div class="gl-dot" style="background:#d4a853"></div>Block</div>
-      <div class="gl-item"><div class="gl-dot" style="background:#e0853c"></div>Algorithm</div>
-      <div class="gl-item"><div class="gl-dot" style="background:#c47a28;border:1.5px dashed rgba(196,122,40,.6)"></div>Step</div>
-      <div class="gl-item"><div class="gl-dot" style="background:rgba(212,168,83,.4);border:1.5px solid #d4a853"></div>B↔B</div>
-      <div class="gl-item"><div class="gl-dot" style="background:rgba(121,184,119,.4);border:1.5px solid #79b877"></div>A→A</div>
-      <div class="gl-item"><div class="gl-dot" style="background:rgba(196,122,40,.4);border:1.5px solid #c47a28"></div>A→Step</div>
-      <div class="gl-item"><div class="gl-dot" style="background:rgba(224,133,60,.4);border:1.5px solid #e0853c"></div>Step→B</div>
+      <div class="gl-item"><div class="gl-dot" style="background:var(--acc);border:2px solid rgba(255,255,255,.3)"></div>Algorithm <span style="font-size:9px;color:var(--txt3)">(색상별 구분)</span></div>
+      <div class="gl-item"><svg width="10" height="10" style="flex-shrink:0"><polygon points="5,0 10,5 5,10 0,5" fill="#e07060" stroke="rgba(255,255,255,.3)" stroke-width="1"/></svg>Step <span style="font-size:9px;color:var(--txt3)">(같은 색 = 같은 알고리즘)</span></div>
+      <div class="gl-item"><div class="gl-dot" style="background:rgba(212,168,83,.4);border:1.5px solid #d4a853"></div>B↔B 연결</div>
+      <div class="gl-item" style="gap:5px"><div style="width:18px;height:2px;background:rgba(121,184,119,.7);border-radius:1px;flex-shrink:0"></div>A→A</div>
+      <div class="gl-item" style="gap:5px"><div style="width:18px;height:2px;background:#e07060;border-radius:1px;flex-shrink:0"></div>A→Step→B <span style="font-size:9px;color:var(--txt3)">(알고리즘 색)</span></div>
     </div>
   </div>
 </div><!-- /main-area -->
@@ -1448,7 +1453,22 @@ let gNodes=[],gEdges=[];
 let gScale=1,gOffX=0,gOffY=0;
 let gDrag=null,gPan=false,gPanStart={x:0,y:0},gPanOff={x:0,y:0};
 let gPinchStart=0,gDpr=1,gW=0,gH=0,gFilterMode='all',gPhysicsTick=0;
+let gCollapsed={};   // algoId → true/false (접힌 알고리즘)
+function toggleAlgoCollapse(algoId){
+  gCollapsed[algoId]=!gCollapsed[algoId];
+  buildGraphData();
+}
+function collapseAllAlgos(){
+  S.algorithms.forEach(a=>gCollapsed[a.id]=true);
+  buildGraphData();
+}
+function expandAllAlgos(){
+  gCollapsed={};
+  buildGraphData();
+}
 const GRAPH_EDGE_COLORS={bb:'rgba(212,168,83,.5)',aa:'rgba(121,184,119,.55)',sb:'rgba(224,133,60,.4)',as:'rgba(196,122,40,.65)'};
+const ALGO_PALETTE=['#e07060','#60a0e0','#70c880','#c878d8','#60c8c0','#e0b040','#a088e0','#e08840','#58b870','#d06898'];
+function algoColor(algoId){const idx=S.algorithms.findIndex(a=>a.id===algoId);return ALGO_PALETTE[idx%ALGO_PALETTE.length]||'#c47a28';}
 let gMode='move'; // 'move' | 'connect' | 'cut'
 let _gResizeObs=null;
 let gViewMode='graph'; // 'graph' | 'nested' | 'rumsfeld'
@@ -1461,7 +1481,7 @@ function setGraphMode(mode, el){
   el.classList.add('on');
   const hint=document.getElementById('gmode-hint');
   const msgs={
-    move:'✥ 이동 모드 — 노드를 드래그해서 위치를 바꾸세요',
+    move:'✥ 이동 모드 — 드래그로 이동 | 알고리즘 노드 더블클릭(더블탭)으로 ⊟접기/⊞펼치기',
     connect:'⟶ 연결 모드 — 노드에서 다른 노드로 드래그해서 연결하세요',
     cut:'✂ 끊기 모드 — 연결선 위를 클릭하면 연결이 끊어집니다'
   };
@@ -1511,104 +1531,139 @@ function setGraphView(view, el){
 }
 
 /* ── 집합 뷰 (Nested Box) ── */
-/* ── 집합 뷰 — 접기/펼치기 ── */
-let nestedCollapsed={};
-function toggleNestedGroup(gid){
-  nestedCollapsed[gid]=!nestedCollapsed[gid];
+let nestedCollapsed={};   // group/algo collapse state
+let nestedAlgoCollapsed={}; // algo step collapse
+function toggleNestedGroup(id,type='group'){
+  if(type==='algo') nestedAlgoCollapsed[id]=!nestedAlgoCollapsed[id];
+  else nestedCollapsed[id]=!nestedCollapsed[id];
   renderNestedView();
 }
 function renderNestedView(){
   const el=document.getElementById('gnested');
-  el.style.cssText='display:flex;flex-direction:column;gap:12px;padding:20px;';
-  const ungrouped=S.blocks.filter(b=>!b.groupId);
-  let html=`<div style="font-family:DM Mono,monospace;font-size:10px;color:var(--txt3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">집합론적 지식 구조 — Group ⊃ Block ⊃ Algorithm · Expression</div>`;
+  el.style.cssText='display:flex;flex-direction:column;gap:14px;padding:20px;padding-bottom:100px;';
 
+  const ALGO_PAL=ALGO_PALETTE||['#e07060','#60a0e0','#70c880','#c878d8','#60c8c0','#e0b040','#a088e0','#e08840'];
+
+  // 알고리즘별 index map (색상 일치)
+  const algoIndexMap={};
+  S.algorithms.forEach((a,i)=>algoIndexMap[a.id]=i);
+
+  // 블록이 어느 Step에 속하는지 Map: blockId → [{algo, stepIdx, step}]
+  const blockAlgoMap={};
+  S.blocks.forEach(b=>blockAlgoMap[b.id]=[]);
+  S.algorithms.forEach(a=>{
+    a.steps.forEach((s,si)=>{
+      (s.blockIds||[]).forEach(bid=>{
+        if(!blockAlgoMap[bid]) blockAlgoMap[bid]=[];
+        blockAlgoMap[bid].push({algo:a, stepIdx:si, step:s});
+      });
+    });
+  });
+
+  let html=`<div style="font-family:DM Mono,monospace;font-size:10px;color:var(--txt3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px">계층 구조 — Group ⊃ Algorithm ⊃ Step ⊃ Block</div>`;
+
+  // ── 그룹별 렌더
   S.groups.forEach(g=>{
-    const blocks=S.blocks.filter(b=>b.groupId===g.id);
-    const algos=[...new Set(blocks.flatMap(b=>S.algorithms.filter(a=>a.steps.some(s=>s.blockIds&&s.blockIds.includes(b.id)))))];
-    const exprs=S.expressions.filter(e=>e.algorithmIds&&e.algorithmIds.some(aid=>algos.find(a=>a.id===aid)));
+    const gBlocks=S.blocks.filter(b=>b.groupId===g.id);
+    // 이 그룹 블록을 사용하는 알고리즘
+    const gAlgos=[...new Set(
+      gBlocks.flatMap(b=>(blockAlgoMap[b.id]||[]).map(x=>x.algo))
+    )];
+    // 이 그룹 블록이 어느 알고리즘에도 없는 것
+    const freeBlocks=gBlocks.filter(b=>!(blockAlgoMap[b.id]||[]).length);
     const isCollapsed=!!nestedCollapsed[g.id];
     const rgb=hexToRgb(g.color);
-    html+=`<div style="border:2px solid ${g.color};border-radius:12px;overflow:hidden;background:rgba(${rgb},.03);min-width:0;width:100%">
-      <!-- 헤더 — 클릭으로 접기/펼치기 -->
-      <div onclick="toggleNestedGroup('${g.id}')" style="display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;background:rgba(${rgb},.06);border-bottom:${isCollapsed?'none':'2px solid '+g.color+'33'}">
-        <span style="font-family:Syne,sans-serif;font-size:14px;font-weight:800;color:${g.color};flex:1">${esc(g.name)}</span>
-        <span style="font-size:11px;font-family:DM Mono,monospace;color:${g.color}88">${blocks.length}B · ${algos.length}A · ${exprs.length}E</span>
-        <span style="font-size:12px;color:${g.color};transition:transform .2s;display:inline-block;transform:rotate(${isCollapsed?'-90deg':'0deg'})">▾</span>
+
+    html+=`<div style="border:2px solid ${g.color};border-radius:14px;overflow:hidden;background:rgba(${rgb},.03)">
+      <div onclick="toggleNestedGroup('${g.id}')" style="display:flex;align-items:center;gap:10px;padding:13px 18px;cursor:pointer;background:rgba(${rgb},.07);border-bottom:${isCollapsed?'none':'1px solid '+g.color+'30'}">
+        <div style="width:10px;height:10px;border-radius:50%;background:${g.color};flex-shrink:0"></div>
+        <span style="font-family:Syne,sans-serif;font-size:15px;font-weight:800;color:${g.color};flex:1">${esc(g.name)}</span>
+        <span style="font-size:11px;font-family:DM Mono,monospace;color:${g.color}99">${gBlocks.length}블록 · ${gAlgos.length}알고리즘</span>
+        <span style="font-size:13px;color:${g.color};display:inline-block;transform:rotate(${isCollapsed?'-90deg':'0deg'});transition:transform .2s">▾</span>
       </div>`;
 
     if(!isCollapsed){
-      html+=`<div style="padding:14px 16px">`;
+      html+=`<div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">`;
 
-      // 블록들
-      if(blocks.length){
-        html+=`<div style="font-size:10px;font-family:DM Mono,monospace;color:var(--txt3);letter-spacing:1px;margin-bottom:8px">BLOCKS (${blocks.length})</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:7px;margin-bottom:${algos.length?'14px':'0'}">`;
-        blocks.forEach(b=>{
-          const bAlgos=S.algorithms.filter(a=>a.steps.some(s=>s.blockIds&&s.blockIds.includes(b.id)));
-          html+=`<div onclick="viewBlock('${b.id}')" style="background:var(--sur2);border:1.5px solid ${g.color}30;border-radius:8px;padding:9px 11px;cursor:pointer;transition:border-color .15s;min-width:0" onmouseover="this.style.borderColor='${g.color}'" onmouseout="this.style.borderColor='${g.color}30'">
-            <div style="font-size:12px;line-height:1.5;color:var(--txt);margin-bottom:5px">${esc(b.content.slice(0,55))}${b.content.length>55?'…':''}</div>
-            <div style="display:flex;gap:4px;flex-wrap:wrap">
-              <span style="font-size:10px;font-family:DM Mono,monospace;padding:1px 6px;border-radius:3px;background:rgba(212,168,83,.1);color:var(--acc)">${b.type}</span>
-              ${bAlgos.map(a=>`<span onclick="event.stopPropagation();viewAlgo('${a.id}')" style="font-size:10px;font-family:DM Mono,monospace;padding:1px 6px;border-radius:3px;background:rgba(224,133,60,.1);color:#e0853c;cursor:pointer" title="${esc(a.title)}">⚙</span>`).join('')}
-            </div>
+      // ── 알고리즘별 계층
+      gAlgos.forEach(a=>{
+        const aIdx=algoIndexMap[a.id]||0;
+        const aColor=ALGO_PAL[aIdx%ALGO_PAL.length];
+        const aCollapsed=!!nestedAlgoCollapsed[a.id];
+        const aRgb=hexToRgb(aColor);
+        // 이 그룹에 속한 블록만 필터
+        const algoStepsWithGroupBlocks=a.steps.map((s,si)=>({
+          ...s, si,
+          blocks:S.blocks.filter(b=>b.groupId===g.id&&(s.blockIds||[]).includes(b.id))
+        })).filter(s=>s.blocks.length);
+
+        html+=`<div style="border:1.5px solid ${aColor}55;border-radius:10px;overflow:hidden;background:rgba(${aRgb},.04)">
+          <div onclick="toggleNestedGroup('${a.id}','algo')" style="display:flex;align-items:center;gap:9px;padding:9px 14px;cursor:pointer;background:rgba(${aRgb},.08)">
+            <div style="width:8px;height:8px;transform:rotate(45deg);background:${aColor};flex-shrink:0"></div>
+            <span style="font-size:13px;font-weight:700;color:${aColor};flex:1">⚙ ${esc(a.title)}</span>
+            <span style="font-size:10px;font-family:DM Mono,monospace;color:${aColor}99">${a.steps.length}단계</span>
+            <span style="font-size:12px;color:${aColor};display:inline-block;transform:rotate(${aCollapsed?'-90deg':'0deg'});transition:transform .2s">▾</span>
           </div>`;
-        });
+
+        if(!aCollapsed){
+          html+=`<div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px">`;
+          a.steps.forEach((s,si)=>{
+            const stepBlocks=S.blocks.filter(b=>b.groupId===g.id&&(s.blockIds||[]).includes(b.id));
+            if(!stepBlocks.length) return;
+            html+=`<div style="display:flex;gap:8px;align-items:flex-start">
+              <!-- 단계 번호 -->
+              <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px">
+                <div style="width:22px;height:22px;transform:rotate(45deg);background:${aColor};border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <span style="transform:rotate(-45deg);font-size:10px;font-weight:700;color:#fff;font-family:DM Mono,monospace">${s.order}</span>
+                </div>
+                ${si<a.steps.length-1?`<div style="width:1.5px;height:8px;background:${aColor}44"></div>`:''}
+              </div>
+              <!-- 단계 내용 -->
+              <div style="flex:1;min-width:0">
+                <div style="font-size:11px;font-weight:700;color:${aColor};font-family:DM Mono,monospace;margin-bottom:5px">${esc(s.title)}</div>
+                <div style="display:flex;flex-wrap:wrap;gap:5px">
+                  ${stepBlocks.map(b=>`<div onclick="viewBlock('${b.id}')" style="background:var(--sur2);border:1px solid ${aColor}30;border-radius:7px;padding:6px 10px;cursor:pointer;font-size:12px;line-height:1.4;color:var(--txt);max-width:240px;transition:border-color .15s" onmouseover="this.style.borderColor='${aColor}'" onmouseout="this.style.borderColor='${aColor}30'">
+                    ${esc(b.content.slice(0,60))}${b.content.length>60?'…':''}
+                    <div style="font-size:10px;font-family:DM Mono,monospace;color:var(--txt3);margin-top:3px">${b.type}</div>
+                  </div>`).join('')}
+                </div>
+              </div>
+            </div>`;
+          });
+          html+=`</div>`;
+        }
         html+=`</div>`;
-      } else {
-        html+=`<div style="color:var(--txt3);font-size:12px;padding:4px 0 8px">블록 없음</div>`;
+      });
+
+      // ── 자유 블록 (어느 알고리즘에도 없는)
+      if(freeBlocks.length){
+        html+=`<div style="border:1px dashed ${g.color}40;border-radius:9px;padding:10px 12px">
+          <div style="font-size:10px;font-family:DM Mono,monospace;color:var(--txt3);margin-bottom:7px">자유 블록 (알고리즘 미연결)</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">
+            ${freeBlocks.map(b=>`<div onclick="viewBlock('${b.id}')" style="background:var(--sur2);border:1px solid ${g.color}25;border-radius:7px;padding:7px 10px;cursor:pointer;font-size:12px;color:var(--txt2)">${esc(b.content.slice(0,50))}${b.content.length>50?'…':''}</div>`).join('')}
+          </div>
+        </div>`;
       }
 
-      // 알고리즘 — 이 그룹의 블록을 쓰는 것들
-      if(algos.length){
-        html+=`<div style="border-top:1px solid ${g.color}22;padding-top:12px;margin-top:2px">
-          <div style="font-size:10px;font-family:DM Mono,monospace;color:var(--txt3);letter-spacing:1px;margin-bottom:8px">ALGORITHMS (${algos.length})</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px">`;
-        algos.forEach(a=>{
-          html+=`<div onclick="viewAlgo('${a.id}')" style="background:var(--sur2);border:1.5px solid rgba(224,133,60,.2);border-radius:7px;padding:7px 11px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='#e0853c'" onmouseout="this.style.borderColor='rgba(224,133,60,.2)'">
-            <div style="font-size:12px;font-weight:600;color:var(--txt)">${esc(a.title)}</div>
-            <div style="font-size:10px;color:var(--txt3);font-family:DM Mono,monospace;margin-top:2px">${a.steps.length}단계</div>
-          </div>`;
-        });
-        html+=`</div></div>`;
-      }
-
-      // 익스프레션
-      if(exprs.length){
-        html+=`<div style="border-top:1px solid ${g.color}22;padding-top:12px;margin-top:12px">
-          <div style="font-size:10px;font-family:DM Mono,monospace;color:var(--txt3);letter-spacing:1px;margin-bottom:8px">EXPRESSIONS (${exprs.length})</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px">`;
-        exprs.forEach(e=>{
-          html+=`<div style="background:var(--sur2);border:1.5px solid rgba(120,170,210,.2);border-radius:7px;padding:7px 11px">
-            <div style="font-size:12px;font-weight:600;color:#78aad2">${esc(e.title)}</div>
-          </div>`;
-        });
-        html+=`</div></div>`;
-      }
-
-      html+=`</div>`;// end body
+      if(!gBlocks.length) html+=`<div style="color:var(--txt3);font-size:12px">블록 없음</div>`;
+      html+=`</div>`;
     }
-    html+=`</div>`;// end group box
+    html+=`</div>`;
   });
 
-  // 미분류
+  // ── 미분류 블록
+  const ungrouped=S.blocks.filter(b=>!b.groupId);
   if(ungrouped.length){
     const isC=!!nestedCollapsed['__ungrouped__'];
     html+=`<div style="border:1.5px dashed var(--bdr2);border-radius:12px;overflow:hidden">
       <div onclick="toggleNestedGroup('__ungrouped__')" style="display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;background:var(--sur2)">
-        <span style="font-family:DM Mono,monospace;font-size:12px;color:var(--txt3);flex:1">미분류 (${ungrouped.length})</span>
-        <span style="font-size:12px;color:var(--txt3);transform:rotate(${isC?'-90deg':'0deg'});display:inline-block">▾</span>
-      </div>`;
-    if(!isC){
-      html+=`<div style="padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:7px">`;
-      ungrouped.forEach(b=>{
-        html+=`<div onclick="viewBlock('${b.id}')" style="background:var(--sur);border:1px solid var(--bdr);border-radius:7px;padding:8px 11px;cursor:pointer;min-width:0">
-          <div style="font-size:12px;line-height:1.5;color:var(--txt2)">${esc(b.content.slice(0,55))}${b.content.length>55?'…':''}</div>
-        </div>`;
-      });
-      html+=`</div>`;
-    }
-    html+=`</div>`;
+        <span style="font-family:DM Mono,monospace;font-size:12px;color:var(--txt3);flex:1">미분류 블록 (${ungrouped.length})</span>
+        <span style="font-size:12px;color:var(--txt3);display:inline-block;transform:rotate(${isC?'-90deg':'0deg'})">▾</span>
+      </div>
+      ${!isC?`<div style="padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">
+        ${ungrouped.map(b=>`<div onclick="viewBlock('${b.id}')" style="background:var(--sur);border:1px solid var(--bdr);border-radius:7px;padding:8px 11px;cursor:pointer;font-size:12px;color:var(--txt2)">${esc(b.content.slice(0,55))}${b.content.length>55?'…':''}</div>`).join('')}
+      </div>`:''}
+    </div>`;
   }
 
   if(!S.groups.length&&!S.blocks.length) html+=`<div class="empty">블록과 그룹을 먼저 만들어보세요</div>`;
@@ -1945,21 +2000,40 @@ function buildGraphData(){
   });
   S.algorithms.forEach((a,i)=>{
     const ang=(i/aLen)*Math.PI*2+.5,r2=Math.min(gW,gH)*.16;
-    gNodes.push({id:a.id,label:a.title.slice(0,7),x:gW/2+r2*Math.cos(ang),y:gH/2+r2*Math.sin(ang),r:20,type:'algo',vx:0,vy:0,sel:false,color:'#e0853c',groupId:'',linkCount:0});
-    // 단계(Step) 노드를 알고리즘과 블록 사이에 생성
-    a.steps.forEach((s,si)=>{
-      const stepId='step_'+a.id+'_'+si;
-      const stepAng=ang+((si-(a.steps.length-1)/2)*0.35);
-      const stepR=r2+80;
-      gNodes.push({
-        id:stepId, label:(s.order)+'.'+(s.title.slice(0,6)),
-        x:gW/2+stepR*Math.cos(stepAng), y:gH/2+stepR*Math.sin(stepAng),
-        r:13, type:'step', vx:0,vy:0,sel:false,
-        color:'#c47a28', groupId:'', algoId:a.id, stepOrder:s.order, stepTitle:s.title
-      });
-      gEdges.push({from:a.id,to:stepId,type:'as',weight:1,stepOrder:s.order});
-      (s.blockIds||[]).forEach(bid=>gEdges.push({from:stepId,to:bid,type:'sb',weight:1}));
+    const algoCol=ALGO_PALETTE[i%ALGO_PALETTE.length]||'#e0853c';
+    const isCollapsed=!!gCollapsed[a.id];
+    // 접힌 상태: 알고리즘에 연결된 블록 수
+    const connectedBlocks=[...new Set(a.steps.flatMap(s=>s.blockIds||[]))];
+    const collapsedLabel=isCollapsed?a.title.slice(0,5)+'…':a.title.slice(0,7);
+    gNodes.push({
+      id:a.id, label:collapsedLabel,
+      x:gW/2+r2*Math.cos(ang), y:gH/2+r2*Math.sin(ang),
+      r:isCollapsed?26:22, type:'algo', vx:0,vy:0,sel:false,
+      color:algoCol, groupId:'', linkCount:0, algoIdx:i,
+      collapsed:isCollapsed, blockCount:connectedBlocks.length, stepCount:a.steps.length
     });
+    if(isCollapsed){
+      // 접힌 상태: step 없이 블록에 직접 엣지
+      connectedBlocks.forEach(bid=>{
+        gEdges.push({from:a.id,to:bid,type:'sb',weight:1,algoColor:algoCol,collapsed:true});
+      });
+    } else {
+      // 펼친 상태: step 노드 생성
+      a.steps.forEach((s,si)=>{
+        const stepId='step_'+a.id+'_'+si;
+        const stepAng=ang+((si-(a.steps.length-1)/2)*0.35);
+        const stepR=r2+85;
+        const stepColor=algoCol;
+        gNodes.push({
+          id:stepId, label:''+s.order,
+          x:gW/2+stepR*Math.cos(stepAng), y:gH/2+stepR*Math.sin(stepAng),
+          r:15, type:'step', vx:0,vy:0,sel:false,
+          color:stepColor, groupId:'', algoId:a.id, stepOrder:s.order, stepTitle:s.title
+        });
+        gEdges.push({from:a.id,to:stepId,type:'as',weight:1,stepOrder:s.order,algoColor:stepColor});
+        (s.blockIds||[]).forEach(bid=>gEdges.push({from:stepId,to:bid,type:'sb',weight:1,algoColor:stepColor}));
+      });
+    }
   });
   // 엣지 — weight: 공유 알고리즘 수
   S.blocks.forEach(b=>{
@@ -1974,6 +2048,15 @@ function buildGraphData(){
     // 기존 algo→block 직접 연결 제거 (step 노드로 대체됨)
   });
   gPhysicsTick=0;
+}
+
+// roundRect polyfill for older browsers
+if(!CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+    this.beginPath();this.moveTo(x+r,y);this.lineTo(x+w-r,y);this.arcTo(x+w,y,x+w,y+r,r);
+    this.lineTo(x+w,y+h-r);this.arcTo(x+w,y+h,x+w-r,y+h,r);this.lineTo(x+r,y+h);
+    this.arcTo(x,y+h,x,y+h-r,r);this.lineTo(x,y+r);this.arcTo(x,y,x+r,y,r);this.closePath();
+  };
 }
 
 function resizeCanvas(cv){
@@ -2055,11 +2138,25 @@ function runGraphLoop(cv){
     gEdges.forEach(e=>{
       const a=gNodes.find(n=>n.id===e.from),b=gNodes.find(n=>n.id===e.to);if(!a||!b)return;
       const isHover=(gMode==='cut'&&gHoverEdge&&gHoverEdge===e);
-      const col=isHover?'rgba(224,85,85,.9)':(GRAPH_EDGE_COLORS[e.type]||GRAPH_EDGE_COLORS.bb);
-      const w=isHover?Math.max(2,3/gScale):Math.max(.8,(1+Math.min((e.weight||1)-1,.8)*.8)*1.5/gScale);
-      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.strokeStyle=col;ctx.lineWidth=w;ctx.setLineDash(isHover?[4,4]:(e.type==='bb'?[]:(e.type==='aa'?[6,3]:[3,3])));ctx.stroke();ctx.setLineDash([]);
+      // 엣지 색: as/sb는 algoColor, bb는 고정, aa는 고정
+      let col;
+      if(isHover) col='rgba(224,85,85,.9)';
+      else if((e.type==='as'||e.type==='sb')&&e.algoColor){
+        const r=parseInt(e.algoColor.slice(1,3),16),g2=parseInt(e.algoColor.slice(3,5),16),b2=parseInt(e.algoColor.slice(5,7),16);
+        col=`rgba(${r},${g2},${b2},${e.type==='as'?0.75:0.45})`;
+      } else col=GRAPH_EDGE_COLORS[e.type]||GRAPH_EDGE_COLORS.bb;
+      const w=isHover?Math.max(2,3/gScale):(e.type==='as'?Math.max(1,1.8/gScale):Math.max(.6,(1+Math.min((e.weight||1)-1,.8)*.8)*1.2/gScale));
+      // 라인 스타일: bb=실선, aa=긴점선, as=실선, sb=짧은점선
+      const dash=isHover?[4,4]:(e.type==='bb'?[]:e.type==='aa'?[6,3]:e.type==='as'?[]:[ 3,3]);
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.strokeStyle=col;ctx.lineWidth=w;ctx.setLineDash(dash);ctx.stroke();ctx.setLineDash([]);
       if(isHover){const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;ctx.font=`700 ${14/gScale}px Noto Sans KR,sans-serif`;ctx.fillStyle='rgba(224,85,85,.9)';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('✂',mx,my-10/gScale);}
-      if(e.type==='aa'||e.type==='sb'||e.type==='as'){const ang=Math.atan2(b.y-a.y,b.x-a.x);const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;const as=8/gScale;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(mx-as*Math.cos(ang-.4),my-as*Math.sin(ang-.4));ctx.lineTo(mx-as*Math.cos(ang+.4),my-as*Math.sin(ang+.4));ctx.closePath();ctx.fillStyle=col;ctx.fill();if(e.type==='as'&&e.stepOrder){ctx.font=`700 ${Math.max(7,9/gScale)}px DM Mono,monospace`;ctx.fillStyle='rgba(196,122,40,.85)';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(e.stepOrder,mx,my-11/gScale);}}
+      // 화살표 — 도착 노드 근처에만 (중간 숫자 완전 제거)
+      if(e.type==='aa'||e.type==='sb'||e.type==='as'){
+        const ang=Math.atan2(b.y-a.y,b.x-a.x);
+        const arrowX=b.x-b.r*Math.cos(ang),arrowY=b.y-b.r*Math.sin(ang);
+        const as2=7/gScale;
+        ctx.beginPath();ctx.moveTo(arrowX,arrowY);ctx.lineTo(arrowX-as2*Math.cos(ang-.42),arrowY-as2*Math.sin(ang-.42));ctx.lineTo(arrowX-as2*Math.cos(ang+.42),arrowY-as2*Math.sin(ang+.42));ctx.closePath();ctx.fillStyle=col;ctx.fill();
+      }
     });
     // 연결 모드: 시작 노드에서 미리보기 링 표시
     if(gMode==='connect'&&gConnectSrc){
@@ -2067,20 +2164,54 @@ function runGraphLoop(cv){
       if(n){ctx.beginPath();ctx.arc(n.x,n.y,n.r+12,0,Math.PI*2);ctx.strokeStyle='rgba(212,168,83,.6)';ctx.lineWidth=2/gScale;ctx.setLineDash([4,4]);ctx.stroke();ctx.setLineDash([]);}
     }
     gNodes.forEach(n=>{
-      ctx.beginPath();ctx.arc(n.x,n.y,n.r+8,0,Math.PI*2);ctx.fillStyle=hex2rgba(n.color,n.sel?.18:.07);ctx.fill();
-      ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.fillStyle=n.sel?n.color:hex2rgba(n.color,.85);ctx.fill();
-      if(n.sel){ctx.strokeStyle='#fff';ctx.lineWidth=2/gScale;ctx.stroke();}
-      const fs=Math.max(7,Math.min(11,n.r*.55));ctx.font=`700 ${fs}px Noto Sans KR,sans-serif`;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(n.label,n.x,n.y);
-      if(n.type==='algo'){ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.strokeStyle=hex2rgba('#fff',.35);ctx.lineWidth=1.5/gScale;ctx.stroke();}
+      if(n.type!=='step'){
+        // 글로우 halo
+        ctx.beginPath();ctx.arc(n.x,n.y,n.r+8,0,Math.PI*2);ctx.fillStyle=hex2rgba(n.color,n.sel?.18:.06);ctx.fill();
+        ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.fillStyle=n.sel?n.color:hex2rgba(n.color,.85);ctx.fill();
+        if(n.sel){ctx.strokeStyle='#fff';ctx.lineWidth=2/gScale;ctx.stroke();}
+        const fs=Math.max(7,Math.min(11,n.r*.55));ctx.font=`700 ${fs}px Noto Sans KR,sans-serif`;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(n.label,n.x,n.y);
+        if(n.type==='algo'){
+        // 외곽 링
+        ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.strokeStyle=hex2rgba('#fff',.35);ctx.lineWidth=1.5/gScale;ctx.stroke();
+        if(n.collapsed){
+          // 접힌 상태: 점선 외곽 + 블록수·단계수 배지
+          ctx.beginPath();ctx.arc(n.x,n.y,n.r+6,0,Math.PI*2);ctx.strokeStyle=hex2rgba(n.color,.5);ctx.lineWidth=1.2/gScale;ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);
+          // 우상단 배지: "Ns Nb"
+          const badge=`${n.stepCount}s·${n.blockCount}b`;
+          const bfs=Math.max(6,8/gScale);
+          ctx.font=`600 ${bfs}px DM Mono,monospace`;
+          const bw=ctx.measureText(badge).width+8/gScale;
+          const bx=n.x+n.r*.55,by=n.y-n.r*.7;
+          ctx.beginPath();ctx.roundRect(bx-bw/2,by-bfs*.8,bw,bfs*1.6,3/gScale);
+          ctx.fillStyle=n.color;ctx.fill();
+          ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(badge,bx,by);
+          // ⊟ 아이콘 힌트
+          ctx.font=`700 ${Math.max(7,9/gScale)}px sans-serif`;ctx.fillStyle='rgba(255,255,255,.5)';ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText('⊟',n.x,n.y+n.r+10/gScale);
+        } else {
+          // 펼친 상태: ⊞ 힌트
+          ctx.font=`700 ${Math.max(7,9/gScale)}px sans-serif`;ctx.fillStyle='rgba(255,255,255,.35)';ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText('⊞',n.x,n.y+n.r+10/gScale);
+        }
+      }
+      }
       if(n.type==='step'){
-        // 단계 번호 배지 (좌상단 작은 원)
-        const bx=n.x-n.r+3,by=n.y-n.r+3,br=6/gScale*Math.min(gScale,1.2);
-        ctx.beginPath();ctx.arc(n.x-n.r*.5,n.y-n.r*.5,Math.max(4,5/gScale),0,Math.PI*2);
-        ctx.fillStyle='rgba(255,255,255,.9)';ctx.fill();
-        ctx.font=`700 ${Math.max(5,6/gScale)}px DM Mono,monospace`;ctx.fillStyle='#c47a28';ctx.textAlign='center';ctx.textBaseline='middle';
-        ctx.fillText(n.stepOrder,n.x-n.r*.5,n.y-n.r*.5);
-        // 점선 테두리
-        ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.strokeStyle='rgba(196,122,40,.5)';ctx.lineWidth=1/gScale;ctx.setLineDash([2,2]);ctx.stroke();ctx.setLineDash([]);
+        const s2=n.r*1.15;
+        // 글로우 halo
+        if(n.sel){
+          ctx.beginPath();ctx.moveTo(n.x,n.y-(s2+7));ctx.lineTo(n.x+(s2+7),n.y);ctx.lineTo(n.x,n.y+(s2+7));ctx.lineTo(n.x-(s2+7),n.y);ctx.closePath();
+          ctx.fillStyle=hex2rgba(n.color,.2);ctx.fill();
+        }
+        // 다이아몬드
+        ctx.beginPath();
+        ctx.moveTo(n.x, n.y-s2);ctx.lineTo(n.x+s2, n.y);ctx.lineTo(n.x, n.y+s2);ctx.lineTo(n.x-s2, n.y);
+        ctx.closePath();
+        ctx.fillStyle=n.sel?n.color:hex2rgba(n.color,.88);ctx.fill();
+        ctx.strokeStyle=n.sel?'#fff':'rgba(255,255,255,.3)';ctx.lineWidth=(n.sel?2:1)/gScale;ctx.stroke();
+        // 번호
+        const sfs=Math.max(8,Math.min(13,n.r*.8));
+        ctx.font=`700 ${sfs}px DM Mono,monospace`;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(n.stepOrder,n.x,n.y);
       }
     });
     ctx.restore();
@@ -2136,6 +2267,7 @@ function bindGraphEvents(cv){
   }
 
   let mouseDown=false;
+  let _lastClickNode=null,_lastClickTime=0;
   cv.onmousedown=e=>{
     const{x,y}=worldXY(e.clientX,e.clientY);
     if(gMode==='cut'){
@@ -2152,7 +2284,17 @@ function bindGraphEvents(cv){
       } else {gConnectSrc=null;}
     }
     const n=findNode(x,y);
-    if(n){gNodes.forEach(nd=>nd.sel=false);n.sel=true;gDrag=(gMode==='move'?n:null);showNodeInfo(n);}
+    if(n){
+      const now=Date.now();
+      // 더블클릭: 알고리즘 노드 접기/펼치기
+      if(n.type==='algo'&&_lastClickNode===n.id&&now-_lastClickTime<400){
+        _lastClickNode=null;_lastClickTime=0;
+        toggleAlgoCollapse(n.id);
+        return;
+      }
+      _lastClickNode=n.id;_lastClickTime=now;
+      gNodes.forEach(nd=>nd.sel=false);n.sel=true;gDrag=(gMode==='move'?n:null);showNodeInfo(n);
+    }
     else{gPan=true;gPanStart={x:e.clientX,y:e.clientY};gPanOff={x:gOffX,y:gOffY};}
     mouseDown=true;cv.classList.add('grabbing');
   };
@@ -2169,7 +2311,12 @@ function bindGraphEvents(cv){
   cv.onmouseup=cv.onmouseleave=()=>{mouseDown=false;gDrag=null;gPan=false;cv.classList.remove('grabbing');};
   cv.onwheel=e=>{e.preventDefault();const r=cv.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;const factor=e.deltaY>0?.88:1.14;const newScale=Math.max(.15,Math.min(5,gScale*factor));gOffX=mx-(mx-gOffX)*(newScale/gScale);gOffY=my-(my-gOffY)*(newScale/gScale);gScale=newScale;updateZoomLabel();};
   let touches=[];
-  cv.ontouchstart=e=>{e.preventDefault();touches=[...e.touches];if(touches.length===2){gPinchStart=Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY);gDrag=null;gPan=false;return;}const{x,y}=worldXY(touches[0].clientX,touches[0].clientY);const n=findNode(x,y);if(n){gNodes.forEach(nd=>nd.sel=false);n.sel=true;if(gMode==='move')gDrag=n;showNodeInfo(n);}else{gPan=true;gPanStart={x:touches[0].clientX,y:touches[0].clientY};gPanOff={x:gOffX,y:gOffY};}};
+  let _lastTapNode=null,_lastTapTime=0;
+  cv.ontouchstart=e=>{e.preventDefault();touches=[...e.touches];if(touches.length===2){gPinchStart=Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY);gDrag=null;gPan=false;return;}const{x,y}=worldXY(touches[0].clientX,touches[0].clientY);const n=findNode(x,y);if(n){
+    const now=Date.now();
+    if(n.type==='algo'&&_lastTapNode===n.id&&now-_lastTapTime<400){_lastTapNode=null;toggleAlgoCollapse(n.id);return;}
+    _lastTapNode=n.id;_lastTapTime=now;
+    gNodes.forEach(nd=>nd.sel=false);n.sel=true;if(gMode==='move')gDrag=n;showNodeInfo(n);}else{gPan=true;gPanStart={x:touches[0].clientX,y:touches[0].clientY};gPanOff={x:gOffX,y:gOffY};}};
   cv.ontouchmove=e=>{e.preventDefault();const ts=[...e.touches];if(ts.length===2){const d=Math.hypot(ts[0].clientX-ts[1].clientX,ts[0].clientY-ts[1].clientY);const factor=d/gPinchStart;const r=cv.getBoundingClientRect();const mx=(ts[0].clientX+ts[1].clientX)/2-r.left,my=(ts[0].clientY+ts[1].clientY)/2-r.top;const newScale=Math.max(.15,Math.min(5,gScale*factor));gOffX=mx-(mx-gOffX)*(newScale/gScale);gOffY=my-(my-gOffY)*(newScale/gScale);gScale=newScale;gPinchStart=d;updateZoomLabel();return;}if(gDrag){const{x,y}=worldXY(ts[0].clientX,ts[0].clientY);gDrag.x=x;gDrag.y=y;gPhysicsTick=9999;}else if(gPan){gOffX=gPanOff.x+(ts[0].clientX-gPanStart.x);gOffY=gPanOff.y+(ts[0].clientY-gPanStart.y);}};
   cv.ontouchend=e=>{if(e.touches.length<2){gPinchStart=0;}if(!e.touches.length){gDrag=null;gPan=false;gConnectSrc=null;}};
 }
@@ -2255,8 +2402,9 @@ function showNodeInfo(n){
     <div style="background:var(--sur2);border:1px solid var(--bdr);border-radius:10px;padding:10px 12px;margin-bottom:10px;max-height:240px;overflow-y:auto">
       ${stepsHtml}
     </div>
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button onclick="gNodeSaveAlgo('${a.id}')" style="padding:6px 14px;background:var(--acc);color:#111;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">저장</button>
+      <button onclick="toggleAlgoCollapse('${a.id}')" style="padding:6px 12px;background:var(--sur3);color:var(--acc3);border:1px solid rgba(63,255,162,.25);border-radius:7px;font-size:12px;cursor:pointer" id="collapse-btn-${a.id}">${gCollapsed['${a.id}']?'⊞ 펼치기':'⊟ 접기'}</button>
       <button onclick="viewAlgo('${a.id}')" style="padding:6px 10px;background:var(--sur3);color:var(--txt2);border:1px solid var(--bdr);border-radius:7px;font-size:12px;cursor:pointer">전체보기 →</button>
     </div>`;
     panel.style.display='flex';
