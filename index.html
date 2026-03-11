@@ -1517,7 +1517,11 @@ function toggleStepCollapse(stepId){
   buildGraphData();
 }
 function collapseAllAlgos(){
-  S.algorithms.forEach(a=>gCollapsed[a.id]=true);
+  S.algorithms.forEach(a=>{
+    gCollapsed[a.id]=true;
+    a.steps.forEach((s,si)=>{gCollapsed['step_'+a.id+'_'+si]=true;});
+  });
+  S.blocks.forEach(b=>{gCollapsed[b.id]=false;}); // block은 펼침 유지
   buildGraphData();
 }
 function expandAllAlgos(){
@@ -2052,8 +2056,11 @@ function setGraphFilter(el,mode){
   el.classList.add('on');gFilterMode=mode;buildGraphData();
 }
 function buildGraphData(){
+  // 기존 노드 위치 저장 (접기/펼치기 시 위치 유지)
+  const _prevPos={};
+  gNodes.forEach(n=>{_prevPos[n.id]={x:n.x,y:n.y};});
   gNodes=[];gEdges=[];
-  const bLen=S.blocks.length,aLen=S.algorithms.length;
+  const bLen=Math.max(1,S.blocks.length),aLen=Math.max(1,S.algorithms.length);
   S.blocks.forEach((b,i)=>{
     const g=S.groups.find(x=>x.id===b.groupId);
     const finalAng=(i/bLen)*Math.PI*2;
@@ -2061,7 +2068,8 @@ function buildGraphData(){
     const linkCount=(b.links||[]).length+S.blocks.filter(x=>(x.links||[]).includes(b.id)).length;
     const r=14+Math.min(linkCount*2,10);
     const isBlockCollapsed=!!gCollapsed[b.id];
-    gNodes.push({id:b.id,label:b.content.slice(0,8),x:gW/2+baseR*Math.cos(finalAng),y:gH/2+baseR*Math.sin(finalAng),r,type:'block',vx:0,vy:0,sel:false,color:g?g.color:'#d4a853',groupId:b.groupId,linkCount,collapsed:isBlockCollapsed});
+    const _bp=_prevPos[b.id];
+    gNodes.push({id:b.id,label:b.content.slice(0,8),x:_bp?_bp.x:gW/2+baseR*Math.cos(finalAng),y:_bp?_bp.y:gH/2+baseR*Math.sin(finalAng),r,type:'block',vx:0,vy:0,sel:false,color:g?g.color:'#d4a853',groupId:b.groupId,linkCount,collapsed:isBlockCollapsed});
   });
   S.algorithms.forEach((a,i)=>{
     const ang=(i/aLen)*Math.PI*2+.5,r2=Math.min(gW,gH)*.16;
@@ -2070,9 +2078,10 @@ function buildGraphData(){
     // 접힌 상태: 알고리즘에 연결된 블록 수
     const connectedBlocks=[...new Set(a.steps.flatMap(s=>s.blockIds||[]))];
     const collapsedLabel=isCollapsed?a.title.slice(0,5)+'…':a.title.slice(0,7);
+    const _ap=_prevPos[a.id];
     gNodes.push({
       id:a.id, label:collapsedLabel,
-      x:gW/2+r2*Math.cos(ang), y:gH/2+r2*Math.sin(ang),
+      x:_ap?_ap.x:gW/2+r2*Math.cos(ang), y:_ap?_ap.y:gH/2+r2*Math.sin(ang),
       r:isCollapsed?26:22, type:'algo', vx:0,vy:0,sel:false,
       color:algoCol, groupId:'', linkCount:0, algoIdx:i,
       collapsed:isCollapsed, blockCount:connectedBlocks.length, stepCount:a.steps.length
@@ -2093,9 +2102,10 @@ function buildGraphData(){
         const stepR=r2+85;
         const stepColor=algoCol;
         const isStepCollapsed=!!gCollapsed[stepId];
+        const _spp=_prevPos[stepId];
         gNodes.push({
           id:stepId, label:''+s.order,
-          x:gW/2+stepR*Math.cos(stepAng), y:gH/2+stepR*Math.sin(stepAng),
+          x:_spp?_spp.x:gW/2+stepR*Math.cos(stepAng), y:_spp?_spp.y:gH/2+stepR*Math.sin(stepAng),
           r:15, type:'step', vx:0,vy:0,sel:false,
           color:stepColor, groupId:'', algoId:a.id, stepOrder:s.order, stepTitle:s.title,
           collapsed:isStepCollapsed
@@ -2121,7 +2131,7 @@ function buildGraphData(){
     (a.linkedAlgoIds||[]).forEach(lid=>gEdges.push({from:a.id,to:lid,type:'aa',weight:1}));
     // 기존 algo→block 직접 연결 제거 (step 노드로 대체됨)
   });
-  gPhysicsTick=0;
+  if(Object.keys(_prevPos).length>0)gPhysicsTick=Math.max(0,gPhysicsTick-50); else gPhysicsTick=0;
 }
 
 // roundRect polyfill for older browsers
@@ -2165,7 +2175,7 @@ function renderGraph(){
     gH=cv.clientHeight||Math.max(window.innerHeight-220,300);
     cv.width=Math.round(gW*gDpr);cv.height=Math.round(gH*gDpr);
     const ctx=cv.getContext('2d');ctx.setTransform(gDpr,0,0,gDpr,0,0);
-    gScale=1;gOffX=gW/2;gOffY=gH/2;
+    gScale=1;gOffX=0;gOffY=0;
     // 기본 상태: 모든 algo/block/step 접힌 상태로 초기화
     gCollapsed={};
     S.algorithms.forEach(a=>{
@@ -2174,9 +2184,6 @@ function renderGraph(){
     });
     // block은 기본 펼침 — 접기는 bb 링크 엣지만 숨기는 것
     buildGraphData();
-    // 노드 초기 위치를 화면 중심 기준으로 재조정
-    gNodes.forEach(n=>{n.x+=gOffX-gW/2;n.y+=gOffY-gH/2;});
-    gOffX=0;gOffY=0;
     bindGraphEvents(cv);runGraphLoop(cv);
   });
 }
@@ -2223,7 +2230,7 @@ function runGraphLoop(cv){
       const maxR=Math.max(...gm.map(n=>Math.sqrt((n.x-cx)**2+(n.y-cy)**2)))+30;
       const grad=ctx.createRadialGradient(cx,cy,0,cx,cy,maxR);grad.addColorStop(0,hex2rgba(g.color,.08));grad.addColorStop(1,hex2rgba(g.color,0));
       ctx.beginPath();ctx.arc(cx,cy,maxR,0,Math.PI*2);ctx.fillStyle=grad;ctx.fill();
-      ctx.font=`700 11px DM Mono,monospace`;ctx.fillStyle=hex2rgba(g.color,.5);ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(g.name,cx,cy-maxR+10);
+      ctx.font=`700 11px DM Mono,monospace`;ctx.fillStyle=hex2rgba(g.color,.5);ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(g.name,cx,cy-maxR+4);
     });
     gEdges.forEach(e=>{
       const a=gNodes.find(n=>n.id===e.from),b=gNodes.find(n=>n.id===e.to);if(!a||!b)return;
@@ -2329,7 +2336,16 @@ function bindGraphEvents(cv){
   cv.onmousedown=cv.onmousemove=cv.onmouseup=cv.onmouseleave=cv.onwheel=null;
   cv.ontouchstart=cv.ontouchmove=cv.ontouchend=null;
   function worldXY(cx,cy){const r=cv.getBoundingClientRect();return{x:(cx-r.left-gOffX)/gScale,y:(cy-r.top-gOffY)/gScale};}
-  function findNode(wx,wy){return gNodes.find(n=>Math.hypot(n.x-wx,n.y-wy)<n.r+8)||null;}
+  function findNode(wx,wy){
+    return gNodes.find(n=>{
+      if(n.type==='step'){
+        // 다이아몬드 hit test: |dx|+|dy| < r*1.15+8
+        const s2=n.r*1.15+8;
+        return Math.abs(wx-n.x)+Math.abs(wy-n.y)<s2;
+      }
+      return Math.hypot(n.x-wx,n.y-wy)<n.r+8;
+    })||null;
+  }
   function findEdge(wx,wy){
     for(const e of gEdges){
       const a=gNodes.find(n=>n.id===e.from),b=gNodes.find(n=>n.id===e.to);
@@ -2349,7 +2365,7 @@ function bindGraphEvents(cv){
       if(!b.links)b.links=[];
       if(!b.links.includes(dstNode.id)){b.links.push(dstNode.id);persist();buildGraphData();
         const info=document.getElementById('ginfo-panel');
-        info.innerHTML=`<span style="color:var(--acc)">✓ 연결됨:</span> ${esc(srcNode.label)} → ${esc(dstNode.label)}`;}
+        info.innerHTML=`<span style="color:var(--acc)">✓ 연결됨:</span> ${esc(srcNode.label)} → ${esc(dstNode.label)}`;info.style.display='flex';}
     }
     // algo→algo
     else if(srcNode.type==='algo'&&dstNode.type==='algo'){
@@ -2357,7 +2373,7 @@ function bindGraphEvents(cv){
       if(!a.linkedAlgoIds)a.linkedAlgoIds=[];
       if(!a.linkedAlgoIds.includes(dstNode.id)){a.linkedAlgoIds.push(dstNode.id);persist();buildGraphData();
         const info=document.getElementById('ginfo-panel');
-        info.innerHTML=`<span style="color:var(--acc3)">✓ 알고리즘 연결됨</span>`;}
+        info.innerHTML=`<span style="color:var(--acc3)">✓ 알고리즘 연결됨</span>`;info.style.display='flex';}
     }
   }
   function applyCut(edge){
@@ -2369,7 +2385,8 @@ function bindGraphEvents(cv){
       if(a&&a.linkedAlgoIds){a.linkedAlgoIds=a.linkedAlgoIds.filter(l=>l!==edge.to);persist();buildGraphData();}
     }
     const info=document.getElementById('ginfo-panel');
-    info.innerHTML=`<span style="color:var(--red)">✂ 연결 끊김</span>`;
+    info.innerHTML=`<span style="color:var(--red)">✂ 연결 끊김</span>`;info.style.display='flex';
+    setTimeout(()=>{if(info.textContent.includes('끊김')){info.innerHTML='';info.style.display='none';requestAnimationFrame(()=>{const cv=document.getElementById('gcanvas');if(cv)resizeCanvas(cv);});}},2500);
     gHoverEdge=null;
   }
 
@@ -2385,7 +2402,7 @@ function bindGraphEvents(cv){
       const n=findNode(x,y);
       if(n){
         if(!gConnectSrc){gConnectSrc=n;gNodes.forEach(nd=>nd.sel=false);n.sel=true;
-          document.getElementById('ginfo-panel').innerHTML=`<span style="color:var(--acc)">⟶ 시작: ${esc(n.label)}</span> — 연결할 노드를 클릭하세요`;}
+          const _ip=document.getElementById('ginfo-panel');_ip.innerHTML=`<span style="color:var(--acc)">⟶ 시작: ${esc(n.label)}</span> — 연결할 노드를 클릭하세요`;_ip.style.display='flex';}
         else{applyConnect(gConnectSrc,n);gConnectSrc=null;gNodes.forEach(nd=>nd.sel=false);}
         return;
       } else {gConnectSrc=null;}
@@ -2403,9 +2420,9 @@ function bindGraphEvents(cv){
       }
       _lastClickNode=n.id;_lastClickTime=now;
       gNodes.forEach(nd=>nd.sel=false);n.sel=true;gDrag=(gMode==='move'?n:null);showNodeInfo(n);
+      mouseDown=true;cv.classList.add('grabbing');
     }
-    else{gPan=true;gPanStart={x:e.clientX,y:e.clientY};gPanOff={x:gOffX,y:gOffY};}
-    mouseDown=true;cv.classList.add('grabbing');
+    else{gPan=true;gPanStart={x:e.clientX,y:e.clientY};gPanOff={x:gOffX,y:gOffY};mouseDown=true;cv.classList.add('grabbing');}
   };
   cv.onmousemove=e=>{
     const{x,y}=worldXY(e.clientX,e.clientY);
@@ -2444,7 +2461,8 @@ function showNodeInfo(n){
   const panel=document.getElementById('ginfo-panel');
   if(n.type==='step'){
     const a=S.algorithms.find(x=>x.id===n.algoId);if(!a)return;
-    const si=n.stepOrder-1;const s=a.steps[si];if(!s)return;
+    const si=a.steps.findIndex(s=>s.order===n.stepOrder);
+    const s=si>=0?a.steps[si]:null;if(!s)return;
     const blocks=S.blocks.filter(b=>(s.blockIds||[]).includes(b.id));
     panel.innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-shrink:0">
@@ -2474,7 +2492,7 @@ function showNodeInfo(n){
       <div style="display:flex;gap:4px;margin-left:auto">
         ${TYPES.map(t=>`<span onclick="gNodeEditType('${b.id}','${t}')" style="font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer;background:${b.type===t?'var(--acc)':'var(--sur3)'};color:${b.type===t?'#111':'var(--txt3)'};border:1px solid ${b.type===t?'var(--acc)':'var(--bdr)'};transition:all .15s">${t}</span>`).join('')}
       </div>
-      <span onclick="document.getElementById('ginfo-panel').innerHTML=''" style="cursor:pointer;color:var(--txt3);font-size:16px;line-height:1;padding:0 4px">✕</span>
+      <span onclick="(()=>{const p=document.getElementById('ginfo-panel');p.innerHTML='';p.style.display='none';requestAnimationFrame(()=>{const cv=document.getElementById('gcanvas');if(cv)resizeCanvas(cv);});})()" style="cursor:pointer;color:var(--txt3);font-size:16px;line-height:1;padding:0 4px">✕</span>
     </div>
     <textarea id="gnode-content-edit" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px;color:var(--txt);font-size:16px;line-height:1.6;resize:none;min-height:64px;field-sizing:content;font-family:Noto Sans KR,sans-serif;margin-bottom:10px" oninput="autoResize(this)">${esc(b.content)}</textarea>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
