@@ -2069,19 +2069,25 @@ function runGraphLoop(cv){
     rafId=requestAnimationFrame(frame);
     if(cv.clientWidth>0&&gW>0&&(gW!==cv.clientWidth||gH!==cv.clientHeight))resizeCanvas(cv);
     ctx.clearRect(0,0,gW,gH);
-    if(physicsOn()&&gPhysicsTick<240){
+    if(physicsOn()&&gPhysicsTick<300){
+      // 노드 수에 따라 damping 강화 — 많을수록 빨리 안정화
+      const damp=Math.max(0.68, 0.82 - gNodes.length * 0.005);
+      let totalKE=0;
       gNodes.forEach(n=>{
         // 모든 노드 간 반발력 — 충분한 간격 확보
-        gNodes.forEach(m=>{if(n===m)return;const dx=n.x-m.x,dy=n.y-m.y,d=Math.sqrt(dx*dx+dy*dy)||1;const minDist=(n.r+m.r)*3.5;const f=d<minDist?Math.min(6000/(d*d),20):Math.min(2400/(d*d),6);n.vx+=f*(dx/d);n.vy+=f*(dy/d);});
+        gNodes.forEach(m=>{if(n===m)return;const dx=n.x-m.x,dy=n.y-m.y,d=Math.sqrt(dx*dx+dy*dy)||1;const minDist=(n.r+m.r)*3.2;const f=d<minDist?Math.min(5000/(d*d),18):Math.min(1800/(d*d),4);n.vx+=f*(dx/d);n.vy+=f*(dy/d);});
         // 중심 인력 (약하게)
-        n.vx+=(gW/2-n.x)*.0015;n.vy+=(gH/2-n.y)*.0015;
+        n.vx+=(gW/2-n.x)*.0012;n.vy+=(gH/2-n.y)*.0012;
         // 같은 그룹끼리 뭉치기 (클러스터링)
-        if(n.groupId)gNodes.filter(m=>m!==n&&m.groupId===n.groupId).forEach(m=>{const dx=m.x-n.x,dy=m.y-n.y,d=Math.sqrt(dx*dx+dy*dy)||1;const target=70;if(d>target){n.vx+=.05*(dx/d)*Math.min(d-target,60);n.vy+=.05*(dy/d)*Math.min(d-target,60);}});
-        n.vx*=.78;n.vy*=.78;n.x+=n.vx;n.y+=n.vy;
+        if(n.groupId)gNodes.filter(m=>m!==n&&m.groupId===n.groupId).forEach(m=>{const dx=m.x-n.x,dy=m.y-n.y,d=Math.sqrt(dx*dx+dy*dy)||1;const target=65;if(d>target){n.vx+=.04*(dx/d)*Math.min(d-target,50);n.vy+=.04*(dy/d)*Math.min(d-target,50);}});
+        n.vx*=damp;n.vy*=damp;n.x+=n.vx;n.y+=n.vy;
         const pad=40;n.x=Math.max(pad,Math.min(gW-pad,n.x));n.y=Math.max(pad,Math.min(gH-pad,n.y));
+        totalKE+=n.vx*n.vx+n.vy*n.vy;
       });
-      gEdges.forEach(e=>{const a=gNodes.find(n=>n.id===e.from),b=gNodes.find(n=>n.id===e.to);if(!a||!b)return;const dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1;const idealLen=e.type==='bb'?160:200;const f=(d-idealLen)*.028;a.vx+=f*(dx/d);a.vy+=f*(dy/d);b.vx-=f*(dx/d);b.vy-=f*(dy/d);});
+      gEdges.forEach(e=>{const a=gNodes.find(n=>n.id===e.from),b=gNodes.find(n=>n.id===e.to);if(!a||!b)return;const dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1;const idealLen=e.type==='bb'?150:190;const f=(d-idealLen)*.022;a.vx+=f*(dx/d);a.vy+=f*(dy/d);b.vx-=f*(dx/d);b.vy-=f*(dy/d);});
       gPhysicsTick++;
+      // 운동에너지가 충분히 작아지면 시뮬레이션 조기 종료
+      if(totalKE/Math.max(1,gNodes.length)<0.08)gPhysicsTick=9999;
     }
     ctx.save();ctx.translate(gOffX,gOffY);ctx.scale(gScale,gScale);
     S.groups.forEach(g=>{
@@ -2240,13 +2246,33 @@ function showNodeInfo(n){
     requestAnimationFrame(()=>{const cv=document.getElementById('gcanvas');if(cv)resizeCanvas(cv);});
   } else {
     const a=S.algorithms.find(x=>x.id===n.id);if(!a)return;
+    const stepsHtml=a.steps.length?a.steps.map((s,si)=>{
+      const blocks=S.blocks.filter(b=>(s.blockIds||[]).includes(b.id));
+      const blocksHtml=blocks.length
+        ?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:4px">${blocks.map(b=>`<span style="font-size:10px;background:rgba(224,133,60,.1);color:#e0853c;border:1px solid rgba(224,133,60,.25);border-radius:4px;padding:1px 6px;font-family:DM Mono,monospace">↗ ${esc(b.content.slice(0,14))}</span>`).join('')}</div>`
+        :'';
+      return `<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;${si<a.steps.length-1?'border-bottom:1px solid var(--bdr)':''}">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:0;flex-shrink:0">
+          <div style="width:20px;height:20px;border-radius:6px;background:rgba(224,133,60,.15);border:1.5px solid rgba(224,133,60,.4);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#e0853c;font-family:DM Mono,monospace">${s.order}</div>
+          ${si<a.steps.length-1?`<div style="width:1.5px;flex:1;min-height:8px;background:rgba(224,133,60,.2);margin-top:3px"></div>`:''}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:var(--txt1);line-height:1.4">${esc(s.title)}</div>
+          ${blocksHtml}
+        </div>
+      </div>`;
+    }).join('')
+    :`<div style="font-size:12px;color:var(--txt3)">단계 없음</div>`;
     panel.innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-shrink:0">
       <span style="font-size:11px;font-family:DM Mono,monospace;color:#e0853c">⚙ ALGORITHM</span>
-      <span onclick="document.getElementById('ginfo-panel').innerHTML=''" style="cursor:pointer;color:var(--txt3);font-size:16px;line-height:1;padding:0 4px;margin-left:auto">✕</span>
+      <span onclick="document.getElementById('ginfo-panel').innerHTML='';requestAnimationFrame(()=>{const cv=document.getElementById('gcanvas');if(cv)resizeCanvas(cv);})" style="cursor:pointer;color:var(--txt3);font-size:16px;line-height:1;padding:0 4px;margin-left:auto">✕</span>
     </div>
-    <input id="gnode-algo-title" type="text" value="${esc(a.title)}" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;color:var(--txt);font-size:14px;font-weight:600;outline:none;margin-bottom:10px">
-    <div style="font-size:11px;color:var(--txt3);margin-bottom:8px">${a.steps.length}단계 · 블록 ${[...new Set(a.steps.flatMap(s=>s.blockIds||[]))].length}개 사용</div>
+    <input id="gnode-algo-title" type="text" value="${esc(a.title)}" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;color:var(--txt);font-size:14px;font-weight:600;outline:none;margin-bottom:8px">
+    <div style="font-size:11px;color:var(--txt3);margin-bottom:10px">${a.steps.length}단계 · 블록 ${[...new Set(a.steps.flatMap(s=>s.blockIds||[]))].length}개 연결</div>
+    <div style="background:var(--sur2);border:1px solid var(--bdr);border-radius:10px;padding:10px 12px;margin-bottom:10px;max-height:240px;overflow-y:auto">
+      ${stepsHtml}
+    </div>
     <div style="display:flex;gap:8px">
       <button onclick="gNodeSaveAlgo('${a.id}')" style="padding:6px 14px;background:var(--acc);color:#111;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">저장</button>
       <button onclick="viewAlgo('${a.id}')" style="padding:6px 10px;background:var(--sur3);color:var(--txt2);border:1px solid var(--bdr);border-radius:7px;font-size:12px;cursor:pointer">전체보기 →</button>
