@@ -1529,7 +1529,7 @@ function expandAllAlgos(){
   buildGraphData();
 }
 const GRAPH_EDGE_COLORS={bb:'rgba(212,168,83,.5)',aa:'rgba(121,184,119,.55)',sb:'rgba(224,133,60,.4)',as:'rgba(196,122,40,.65)'};
-const ALGO_PALETTE=['#e07060','#60a0e0','#70c880','#c878d8','#60c8c0','#e0b040','#a088e0','#e08840','#58b870','#d06898'];
+const ALGO_PALETTE=['#7ec8a0','#e07878','#78aed4','#d4a04a','#a87ed4','#60c4b8','#d47878','#88c468','#c490d8','#e0c060'];
 function algoColor(algoId){const idx=S.algorithms.findIndex(a=>a.id===algoId);return ALGO_PALETTE[idx%ALGO_PALETTE.length]||'#c47a28';}
 function hexToRgb(hex){
   const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
@@ -2056,83 +2056,116 @@ function setGraphFilter(el,mode){
   el.classList.add('on');gFilterMode=mode;buildGraphData();
 }
 function buildGraphData(){
-  /* ══════════════════════════════════════════════════
-     방사형 트리 레이아웃 (마인드맵 스타일)
-     알고리즘 → 중앙 원형 배치
-     각 알고리즘 → step 부채꼴 방사
-     각 step → 연결 block 방사 (step 미사용시 algo에서 직접)
-     block 전용(알고리즘 미연결) → 바깥쪽 배치
-  ══════════════════════════════════════════════════ */
+  /*
+   * 계층적 방사형 레이아웃
+   * Center → Algo → Step → Block 순서로 바깥쪽으로 배치
+   * 각 알고리즘은 자기 방향 각도 기준으로 step/block을 펼침
+   * 섹터 폭은 (step수 × block수) 비례 배분
+   */
   const _prevPos={};
   gNodes.forEach(n=>{_prevPos[n.id]={x:n.x,y:n.y};});
   gNodes=[];gEdges=[];
 
-  const CX=gW/2, CY=gH/2;
-  const aLen=Math.max(1,S.algorithms.length);
+  const W=gW, H=gH, CX=W/2, CY=H/2;
+  const aLen=S.algorithms.length;
+  if(aLen===0){
+    // 알고리즘 없으면 단독 블록만 외곽 배치
+    const outerR=Math.min(W,H)*0.35;
+    S.blocks.forEach((b,i)=>{
+      const ang=(i/Math.max(1,S.blocks.length))*Math.PI*2-Math.PI/2;
+      const g=S.groups.find(x=>x.id===b.groupId);
+      const lc=(b.links||[]).length+S.blocks.filter(x=>(x.links||[]).includes(b.id)).length;
+      const _p=_prevPos[b.id];
+      gNodes.push({id:b.id,label:b.content,x:_p?_p.x:CX+outerR*Math.cos(ang),y:_p?_p.y:CY+outerR*Math.sin(ang),r:14+Math.min(lc*2,8),type:'block',vx:0,vy:0,sel:false,color:g?g.color:'#d4a853',groupId:b.groupId,linkCount:lc,collapsed:!!gCollapsed[b.id]});
+    });
+    S.blocks.forEach(b=>{(b.links||[]).forEach(lid=>{gEdges.push({from:b.id,to:lid,type:'bb',weight:1});});});
+    gPhysicsTick=0;return;
+  }
 
-  // ── 1. 알고리즘별로 담당 각도 섹터 분할 ──
-  // 각 알고리즘은 360/aLen 도씩 방사 방향을 가짐
-  const algoAngles={};
+  const minDim=Math.min(W,H);
+  // 거리 단계: algo는 중앙 바로 옆, step은 그 바깥, block은 더 바깥
+  const ALGO_R   = aLen===1 ? 0 : minDim*0.10;
+  const STEP_D   = minDim*0.22;  // algo → step
+  const BLOCK_D  = minDim*0.20;  // step → block
+
+  // ── 섹터 계산: 각 algo의 담당 각도 폭 ──
+  // 펼쳐진 algo는 step수×block수 비례, 접힌 algo는 최소 폭
+  const algoWeights=S.algorithms.map(a=>{
+    if(!!gCollapsed[a.id]) return 1;
+    const totalBlocks=a.steps.reduce((s,st)=>s+(st.blockIds||[]).length,0)||1;
+    return Math.max(1, a.steps.length * 0.6 + totalBlocks * 0.4);
+  });
+  const totalWeight=algoWeights.reduce((s,w)=>s+w,0)||1;
+
+  let curAng=-Math.PI/2; // 12시 방향부터 시작
+  const algoMidAngs=[];
+  const algoSectorW=[];
   S.algorithms.forEach((a,i)=>{
-    algoAngles[a.id]=(i/aLen)*Math.PI*2 - Math.PI/2; // 위쪽(12시)에서 시작
+    const w=(algoWeights[i]/totalWeight)*Math.PI*2;
+    algoMidAngs.push(curAng+w/2);
+    algoSectorW.push(w);
+    curAng+=w;
   });
 
-  // ── 2. 알고리즘 노드 ──
-  const algoR=Math.min(gW,gH)*0.12; // 중앙에서 알고리즘까지 거리
+  // ── 알고리즘 노드 배치 ──
   S.algorithms.forEach((a,i)=>{
     const algoCol=ALGO_PALETTE[i%ALGO_PALETTE.length]||'#e0853c';
     const isCollapsed=!!gCollapsed[a.id];
     const connectedBlocks=[...new Set(a.steps.flatMap(s=>s.blockIds||[]))];
-    const ang=algoAngles[a.id];
+    const ang=algoMidAngs[i];
     const _ap=_prevPos[a.id];
-    const ax=_ap?_ap.x:CX+algoR*Math.cos(ang);
-    const ay=_ap?_ap.y:CY+algoR*Math.sin(ang);
+    const ax=_ap?_ap.x:CX+ALGO_R*Math.cos(ang);
+    const ay=_ap?_ap.y:CY+ALGO_R*Math.sin(ang);
+
     gNodes.push({
-      id:a.id, label:a.title.slice(0,10),
-      x:ax, y:ay,
-      r:isCollapsed?28:24, type:'algo', vx:0,vy:0, sel:false,
+      id:a.id, label:a.title,
+      x:ax, y:ay, r:isCollapsed?28:22,
+      type:'algo', vx:0,vy:0, sel:false,
       color:algoCol, groupId:'', linkCount:0, algoIdx:i,
-      collapsed:isCollapsed, blockCount:connectedBlocks.length, stepCount:a.steps.length,
-      ang:ang
+      collapsed:isCollapsed, blockCount:connectedBlocks.length,
+      stepCount:a.steps.length, ang:ang
     });
 
     if(isCollapsed){
-      // 접힌 알고리즘: 블록에 직접 선
-      connectedBlocks.forEach(bid=>{
+      // 접힌 알고리즘: block들을 algo 기준 좁은 섹터에 배치
+      const cbLen=connectedBlocks.length;
+      connectedBlocks.forEach((bid,bi)=>{
+        const bAng=cbLen===1?ang:ang-(0.3*(cbLen-1)/2)+(bi/(cbLen-1))*0.3*(cbLen-1);
+        const bDist=STEP_D+BLOCK_D*0.6;
+        const b=S.blocks.find(x=>x.id===bid);if(!b)return;
+        const g=S.groups.find(x=>x.id===b.groupId);
+        const lc=(b.links||[]).length+S.blocks.filter(x=>(x.links||[]).includes(b.id)).length;
+        const _p=_prevPos[bid];
+        if(!gNodes.find(x=>x.id===bid)){
+          gNodes.push({id:bid,label:b.content,x:_p?_p.x:ax+bDist*Math.cos(bAng),y:_p?_p.y:ay+bDist*Math.sin(bAng),r:Math.min(15,13+Math.min(lc,3)),type:'block',vx:0,vy:0,sel:false,color:g?g.color:'#d4a853',groupId:b.groupId,linkCount:lc,collapsed:!!gCollapsed[bid]});
+        }
         gEdges.push({from:a.id,to:bid,type:'sb',weight:1,algoColor:algoCol,collapsed:true});
       });
       return;
     }
 
-    // ── 3. Step 노드 ──
-    const totalSteps=a.steps.length;
-    if(totalSteps===0) return;
+    // ── Step 배치 ──
+    const steps=a.steps;
+    const sLen=steps.length;
+    if(sLen===0)return;
 
-    // 이 알고리즘의 "섹터 폭" — 알고리즘 수에 따라 배분
-    const sectorW=Math.min((Math.PI*2/aLen)*0.82, Math.PI*1.2);
-    // step들을 섹터 내 균등 배분
-    const stepDist=Math.min(gW,gH)*0.22; // algo→step 거리
-    S.algorithms[i].steps.forEach((s,si)=>{
+    const sSector=algoSectorW[i]*0.85; // step에 섹터 폭의 85% 사용
+    steps.forEach((s,si)=>{
       const stepId='step_'+a.id+'_'+si;
       const isStepCollapsed=!!gCollapsed[stepId];
       const stepColor=algoCol;
 
-      // step 배치 각도: algo 방향에서 섹터 내 균등
-      let stepAng;
-      if(totalSteps===1){
-        stepAng=ang;
-      } else {
-        stepAng=ang - sectorW/2 + (si/(totalSteps-1))*sectorW;
-      }
+      // step 각도: 섹터 내 균등 배분
+      const stepAng=sLen===1?ang:(ang-sSector/2+(si/(sLen-1))*sSector);
 
       const _spp=_prevPos[stepId];
-      const sx=_spp?_spp.x:ax+stepDist*Math.cos(stepAng);
-      const sy=_spp?_spp.y:ay+stepDist*Math.sin(stepAng);
+      const sx=_spp?_spp.x:ax+STEP_D*Math.cos(stepAng);
+      const sy=_spp?_spp.y:ay+STEP_D*Math.sin(stepAng);
 
       gNodes.push({
         id:stepId, label:''+s.order,
-        x:sx, y:sy,
-        r:16, type:'step', vx:0,vy:0, sel:false,
+        x:sx, y:sy, r:16,
+        type:'step', vx:0,vy:0, sel:false,
         color:stepColor, groupId:'', algoId:a.id,
         stepOrder:s.order, stepTitle:s.title,
         collapsed:isStepCollapsed, ang:stepAng
@@ -2140,35 +2173,24 @@ function buildGraphData(){
       gEdges.push({from:a.id,to:stepId,type:'as',weight:1,stepOrder:s.order,algoColor:stepColor});
 
       if(!isStepCollapsed){
-        // ── 4. Block 노드 (step 연결) ──
+        // ── Block 배치 ──
         const blockIds=s.blockIds||[];
-        if(blockIds.length===0) return;
-        const blockDist=Math.min(gW,gH)*0.17; // step→block 거리
-        const bSectorW=Math.min(0.9, 0.28*blockIds.length);
+        const bLen=blockIds.length;
+        if(bLen===0)return;
+
+        // block 섹터 폭: 개수 비례 (최소 0.25rad, 최대 1.0rad)
+        const bSector=Math.min(Math.max(bLen*0.22, 0.25), 1.0);
+
         blockIds.forEach((bid,bi)=>{
-          let bAng;
-          if(blockIds.length===1){
-            bAng=stepAng;
-          } else {
-            bAng=stepAng - bSectorW/2 + (bi/(blockIds.length-1))*bSectorW;
-          }
+          const bAng=bLen===1?stepAng:(stepAng-bSector/2+(bi/(bLen-1))*bSector);
           const b=S.blocks.find(x=>x.id===bid);if(!b)return;
           const g=S.groups.find(x=>x.id===b.groupId);
-          const linkCount=(b.links||[]).length+S.blocks.filter(x=>(x.links||[]).includes(b.id)).length;
-          const br=13+Math.min(linkCount*1.5,8);
-          const _bp=_prevPos[bid];
-          // block이 이미 배치됐으면 기존 위치 사용
-          const existing=gNodes.find(x=>x.id===bid);
-          if(!existing){
-            const bx=_bp?_bp.x:sx+blockDist*Math.cos(bAng);
-            const by=_bp?_bp.y:sy+blockDist*Math.sin(bAng);
-            gNodes.push({
-              id:bid, label:b.content.slice(0,8),
-              x:bx, y:by,
-              r:br, type:'block', vx:0,vy:0, sel:false,
-              color:g?g.color:'#d4a853', groupId:b.groupId,
-              linkCount, collapsed:!!gCollapsed[bid]
-            });
+          const lc=(b.links||[]).length+S.blocks.filter(x=>(x.links||[]).includes(b.id)).length;
+          const _p=_prevPos[bid];
+          if(!gNodes.find(x=>x.id===bid)){
+            const bx=_p?_p.x:sx+BLOCK_D*Math.cos(bAng);
+            const by=_p?_p.y:sy+BLOCK_D*Math.sin(bAng);
+            gNodes.push({id:bid,label:b.content,x:bx,y:by,r:Math.min(15,13+Math.min(lc,3)),type:'block',vx:0,vy:0,sel:false,color:g?g.color:'#d4a853',groupId:b.groupId,linkCount:lc,collapsed:!!gCollapsed[bid]});
           }
           gEdges.push({from:stepId,to:bid,type:'sb',weight:1,algoColor:stepColor});
         });
@@ -2176,50 +2198,38 @@ function buildGraphData(){
     });
   });
 
-  // ── 5. 알고리즘에 연결 안 된 단독 Block ──
-  const placedBlockIds=new Set(gNodes.filter(n=>n.type==='block').map(n=>n.id));
-  const loneBlocks=S.blocks.filter(b=>!placedBlockIds.has(b.id));
-  if(loneBlocks.length>0){
-    const outerR=Math.min(gW,gH)*0.42;
-    loneBlocks.forEach((b,i)=>{
-      const ang=(i/Math.max(1,loneBlocks.length))*Math.PI*2 - Math.PI/2;
+  // ── 단독 Block (알고리즘에 연결 안 된 것) ──
+  const placed=new Set(gNodes.filter(n=>n.type==='block').map(n=>n.id));
+  const lone=S.blocks.filter(b=>!placed.has(b.id));
+  if(lone.length){
+    const outerR=ALGO_R+STEP_D+BLOCK_D+minDim*0.06;
+    lone.forEach((b,i)=>{
+      const ang=(i/Math.max(1,lone.length))*Math.PI*2-Math.PI/2;
       const g=S.groups.find(x=>x.id===b.groupId);
-      const linkCount=(b.links||[]).length+S.blocks.filter(x=>(x.links||[]).includes(b.id)).length;
-      const br=13+Math.min(linkCount*1.5,8);
-      const _bp=_prevPos[b.id];
-      gNodes.push({
-        id:b.id, label:b.content.slice(0,8),
-        x:_bp?_bp.x:CX+outerR*Math.cos(ang),
-        y:_bp?_bp.y:CY+outerR*Math.sin(ang),
-        r:br, type:'block', vx:0,vy:0, sel:false,
-        color:g?g.color:'#d4a853', groupId:b.groupId,
-        linkCount, collapsed:!!gCollapsed[b.id]
-      });
+      const lc=(b.links||[]).length+S.blocks.filter(x=>(x.links||[]).includes(b.id)).length;
+      const _p=_prevPos[b.id];
+      gNodes.push({id:b.id,label:b.content,x:_p?_p.x:CX+outerR*Math.cos(ang),y:_p?_p.y:CY+outerR*Math.sin(ang),r:Math.min(15,13+Math.min(lc,3)),type:'block',vx:0,vy:0,sel:false,color:g?g.color:'#d4a853',groupId:b.groupId,linkCount:lc,collapsed:!!gCollapsed[b.id]});
     });
   }
 
-  // ── 6. Block↔Block 링크 엣지 ──
+  // ── Block↔Block 링크 ──
   S.blocks.forEach(b=>{
     if(gCollapsed[b.id])return;
     (b.links||[]).forEach(lid=>{
       if(gCollapsed[lid])return;
-      const sharedAlgos=S.algorithms.filter(a=>
-        a.steps.some(s=>(s.blockIds||[]).includes(b.id))&&
-        a.steps.some(s=>(s.blockIds||[]).includes(lid))
-      ).length;
-      gEdges.push({from:b.id,to:lid,type:'bb',weight:1+sharedAlgos});
+      const shared=S.algorithms.filter(a=>a.steps.some(s=>(s.blockIds||[]).includes(b.id))&&a.steps.some(s=>(s.blockIds||[]).includes(lid))).length;
+      gEdges.push({from:b.id,to:lid,type:'bb',weight:1+shared});
     });
   });
 
-  // ── 7. Algo↔Algo 연결 ──
+  // ── Algo↔Algo 연결 ──
   S.algorithms.forEach(a=>{
     (a.linkedAlgoIds||[]).forEach(lid=>{
       gEdges.push({from:a.id,to:lid,type:'aa',weight:1});
     });
   });
 
-  // 위치 유지 시 물리 틱 부드럽게 재개
-  if(Object.keys(_prevPos).length>0) gPhysicsTick=Math.max(250,gPhysicsTick);
+  if(Object.keys(_prevPos).length>0) gPhysicsTick=Math.max(260,gPhysicsTick);
   else gPhysicsTick=0;
 }
 
@@ -2293,205 +2303,360 @@ function runGraphLoop(cv){
       ctx.restore();return;
     }
     if(physicsOn()&&gPhysicsTick<300){
-      /* 마인드맵 물리: 계층 구조 스프링 + 형제 노드 반발 */
-      const damp=0.75;
+      /* 마인드맵 물리: block/step만 이동, algo 고정 */
+      const damp=0.72;
       let totalKE=0;
-      // 같은 부모를 공유하는 형제 노드 목록 미리 계산
-      const siblings={}; // parentId → [childIds]
-      gEdges.forEach(e=>{
-        if(e.type==='as'||e.type==='sb'){
-          if(!siblings[e.from])siblings[e.from]=[];
-          siblings[e.from].push(e.to);
-        }
-      });
       gNodes.forEach(n=>{
-        if(n.type==='algo') return; // algo는 고정
-        // 형제 간 반발력 (같은 부모 공유)
+        if(n.type==='algo')return;
+        // 모든 비-algo 노드와의 반발력
         gNodes.forEach(m=>{
           if(n===m||m.type==='algo')return;
           const dx=n.x-m.x,dy=n.y-m.y,d=Math.hypot(dx,dy)||1;
-          const minD=(n.r+m.r)*2.8;
+          const minD=(n.r+m.r)*(n.type==='block'&&m.type==='block'?3.5:2.2);
           if(d<minD){
-            const f=Math.min(600/(d*d), 12);
-            n.vx+=f*(dx/d); n.vy+=f*(dy/d);
+            const f=Math.min(800/(d*d),14);
+            n.vx+=f*(dx/d);n.vy+=f*(dy/d);
           }
         });
-        n.vx*=damp; n.vy*=damp; n.x+=n.vx; n.y+=n.vy;
-        const pad=30;
-        n.x=Math.max(pad,Math.min(gW-pad,n.x));
-        n.y=Math.max(pad,Math.min(gH-pad,n.y));
+        n.vx*=damp;n.vy*=damp;n.x+=n.vx;n.y+=n.vy;
+        n.x=Math.max(30,Math.min(gW-30,n.x));
+        n.y=Math.max(30,Math.min(gH-30,n.y));
         totalKE+=n.vx*n.vx+n.vy*n.vy;
       });
-      // 스프링: as/sb 엣지만 (계층 구조 유지)
+      // 스프링: step을 algo에, block을 step에 당김
       gEdges.forEach(e=>{
-        if(e.type!=='as'&&e.type!=='sb')return;
-        const a=gNodes.find(n=>n.id===e.from),b=gNodes.find(n=>n.id===e.to);
-        if(!a||!b)return;
-        if(a.type==='algo'&&b.type==='step') return; // algo-step은 고정 거리 유지
-        const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1;
-        const ideal=e.type==='as'?Math.min(gW,gH)*0.22:Math.min(gW,gH)*0.17;
-        const f=(d-ideal)*0.03;
-        // block만 이동 (부모 step/algo는 덜 이동)
-        if(b.type==='block'){b.vx+=f*(dx/d);b.vy+=f*(dy/d);}
-        if(a.type==='step'){a.vx+=f*(dx/d)*0.3;a.vy+=f*(dy/d)*0.3;}
+        if(e.type==='bb'||e.type==='aa')return;
+        const na=gNodes.find(n=>n.id===e.from),nb=gNodes.find(n=>n.id===e.to);
+        if(!na||!nb)return;
+        const dx=nb.x-na.x,dy=nb.y-na.y,d=Math.hypot(dx,dy)||1;
+        const ideal=e.type==='as'?Math.min(gW,gH)*0.22:Math.min(gW,gH)*0.20;
+        const f=(d-ideal)*0.025;
+        if(nb.type==='block'){nb.vx+=f*(dx/d);nb.vy+=f*(dy/d);}
+        if(na.type==='step'){na.vx+=f*(dx/d)*0.2;na.vy+=f*(dy/d)*0.2;}
       });
       gPhysicsTick++;
-      if(totalKE/Math.max(1,gNodes.length)<0.05) gPhysicsTick=9999;
+      if(totalKE/Math.max(1,gNodes.length)<0.04)gPhysicsTick=9999;
     }
     ctx.save();ctx.translate(gOffX,gOffY);ctx.scale(gScale,gScale);
+
+    const screenCX=(gW/2-gOffX)/gScale;
+    const screenCY=(gH/2-gOffY)/gScale;
+
+    /* ═══════════════════════════════════════════
+       LAYER 0: 그룹 기관막 (Organ membrane)
+       Group = 기관 — 가장 바깥 반투명 영역
+    ═══════════════════════════════════════════ */
     S.groups.forEach(g=>{
-      const gm=gNodes.filter(n=>n.groupId===g.id);if(gm.length<2)return;
-      const cx=gm.reduce((s,n)=>s+n.x,0)/gm.length,cy=gm.reduce((s,n)=>s+n.y,0)/gm.length;
-      const maxR=Math.max(...gm.map(n=>Math.sqrt((n.x-cx)**2+(n.y-cy)**2)))+30;
-      const grad=ctx.createRadialGradient(cx,cy,0,cx,cy,maxR);grad.addColorStop(0,hex2rgba(g.color,.08));grad.addColorStop(1,hex2rgba(g.color,0));
-      ctx.beginPath();ctx.arc(cx,cy,maxR,0,Math.PI*2);ctx.fillStyle=grad;ctx.fill();
-      ctx.font=`700 11px DM Mono,monospace`;ctx.fillStyle=hex2rgba(g.color,.5);ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(g.name,cx,cy-maxR+4);
+      const gm=gNodes.filter(n=>n.groupId===g.id&&n.type==='block');
+      if(gm.length<1)return;
+      const cx=gm.reduce((s,n)=>s+n.x,0)/gm.length;
+      const cy=gm.reduce((s,n)=>s+n.y,0)/gm.length;
+      const maxR=Math.max(...gm.map(n=>Math.hypot(n.x-cx,n.y-cy)+n.r))+32;
+      // 유기적인 원형 막
+      const grad=ctx.createRadialGradient(cx,cy,maxR*0.3,cx,cy,maxR);
+      grad.addColorStop(0,hex2rgba(g.color,.04));
+      grad.addColorStop(0.7,hex2rgba(g.color,.07));
+      grad.addColorStop(1,hex2rgba(g.color,.0));
+      ctx.beginPath();ctx.arc(cx,cy,maxR,0,Math.PI*2);
+      ctx.fillStyle=grad;ctx.fill();
+      // 점선 막 테두리
+      ctx.beginPath();ctx.arc(cx,cy,maxR,0,Math.PI*2);
+      ctx.strokeStyle=hex2rgba(g.color,.18);ctx.lineWidth=1.2/gScale;
+      ctx.setLineDash([6/gScale,4/gScale]);ctx.stroke();ctx.setLineDash([]);
+      // 그룹 이름
+      ctx.font=`700 ${Math.max(10,12/gScale)}px DM Mono,monospace`;
+      ctx.fillStyle=hex2rgba(g.color,.55);ctx.textAlign='center';ctx.textBaseline='top';
+      ctx.fillText(g.name,cx,cy-maxR+4/gScale);
     });
+
+    /* ═══════════════════════════════════════════
+       LAYER 1: Algorithm 세포 전체 막 (Cell membrane)
+       펼쳐진 algo는 step+block을 감싸는 큰 세포막 렌더
+    ═══════════════════════════════════════════ */
+    S.algorithms.forEach(a=>{
+      if(gCollapsed[a.id])return;
+      const algoNode=gNodes.find(n=>n.id===a.id);if(!algoNode)return;
+      const algoCol=algoNode.color;
+      // 이 알고리즘에 속한 모든 노드
+      const ownNodes=[algoNode,
+        ...gNodes.filter(n=>n.type==='step'&&n.algoId===a.id),
+        ...gNodes.filter(n=>n.type==='block'&&a.steps.some(s=>(s.blockIds||[]).includes(n.id)))
+      ];
+      if(ownNodes.length<2)return;
+      const cx=ownNodes.reduce((s,n)=>s+n.x,0)/ownNodes.length;
+      const cy=ownNodes.reduce((s,n)=>s+n.y,0)/ownNodes.length;
+      const maxR=Math.max(...ownNodes.map(n=>Math.hypot(n.x-cx,n.y-cy)+n.r))+28;
+      // 세포막 gradient
+      const cmGrad=ctx.createRadialGradient(cx,cy,maxR*0.5,cx,cy,maxR);
+      cmGrad.addColorStop(0,hex2rgba(algoCol,.0));
+      cmGrad.addColorStop(0.75,hex2rgba(algoCol,.05));
+      cmGrad.addColorStop(1,hex2rgba(algoCol,.12));
+      ctx.beginPath();ctx.arc(cx,cy,maxR,0,Math.PI*2);
+      ctx.fillStyle=cmGrad;ctx.fill();
+      // 세포막 테두리 (실선+약한 글로우)
+      ctx.beginPath();ctx.arc(cx,cy,maxR,0,Math.PI*2);
+      ctx.strokeStyle=hex2rgba(algoCol,.28);ctx.lineWidth=1.5/gScale;
+      ctx.setLineDash([]);ctx.stroke();
+      // 내부 하이라이트 링
+      ctx.beginPath();ctx.arc(cx,cy,maxR*0.96,0,Math.PI*2);
+      ctx.strokeStyle=hex2rgba(algoCol,.08);ctx.lineWidth=3/gScale;ctx.stroke();
+    });
+
+    /* ═══════════════════════════════════════════
+       LAYER 2: 엣지 (세포질 흐름)
+       직선 대신 부드러운 곡선 베지어
+    ═══════════════════════════════════════════ */
     gEdges.forEach(e=>{
-      const a=gNodes.find(n=>n.id===e.from),b=gNodes.find(n=>n.id===e.to);if(!a||!b)return;
+      const na=gNodes.find(n=>n.id===e.from),nb=gNodes.find(n=>n.id===e.to);
+      if(!na||!nb)return;
       const isHover=(gMode==='cut'&&gHoverEdge&&gHoverEdge===e);
-      // 엣지 색: as/sb는 algoColor, bb는 고정, aa는 고정
       let col;
       if(isHover) col='rgba(224,85,85,.9)';
       else if((e.type==='as'||e.type==='sb')&&e.algoColor){
-        const r=parseInt(e.algoColor.slice(1,3),16),g2=parseInt(e.algoColor.slice(3,5),16),b2=parseInt(e.algoColor.slice(5,7),16);
-        col=`rgba(${r},${g2},${b2},${e.type==='as'?0.75:0.45})`;
-      } else col=GRAPH_EDGE_COLORS[e.type]||GRAPH_EDGE_COLORS.bb;
-      const w=isHover?Math.max(2,3/gScale):(e.type==='as'?Math.max(1,1.8/gScale):Math.max(.6,(1+Math.min((e.weight||1)-1,.8)*.8)*1.2/gScale));
-      // 라인 스타일: bb=실선, aa=긴점선, as=실선, sb=짧은점선
-      const dash=isHover?[4,4]:(e.type==='bb'?[]:e.type==='aa'?[6,3]:e.type==='as'?[]:[ 3,3]);
-      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.strokeStyle=col;ctx.lineWidth=w;ctx.setLineDash(dash);ctx.stroke();ctx.setLineDash([]);
-      if(isHover){const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;ctx.font=`700 ${14/gScale}px Noto Sans KR,sans-serif`;ctx.fillStyle='rgba(224,85,85,.9)';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('✂',mx,my-10/gScale);}
-      // 화살표 — 도착 노드 근처에만 (중간 숫자 완전 제거)
+        const rr=parseInt(e.algoColor.slice(1,3),16),gg=parseInt(e.algoColor.slice(3,5),16),bb2=parseInt(e.algoColor.slice(5,7),16);
+        col=`rgba(${rr},${gg},${bb2},${e.type==='as'?0.6:0.35})`;
+      } else if(e.type==='bb') col='rgba(212,168,83,.35)';
+      else if(e.type==='aa') col='rgba(121,184,119,.5)';
+      else col='rgba(200,180,140,.3)';
+
+      const lw=isHover?3/gScale:(e.type==='as'?1.6/gScale:e.type==='bb'?1.2/gScale:1/gScale);
+      const ang0=Math.atan2(nb.y-na.y,nb.x-na.x);
+      const ex0=na.x+na.r*Math.cos(ang0),ey0=na.y+na.r*Math.sin(ang0);
+      const ex1=nb.x-nb.r*Math.cos(ang0),ey1=nb.y-nb.r*Math.sin(ang0);
+
+      // 곡선 베지어: 중간에 살짝 휘어지는 유기적 곡선
+      const mx=(ex0+ex1)/2,my=(ey0+ey1)/2;
+      const perp=Math.atan2(nb.y-na.y,nb.x-na.x)+Math.PI/2;
+      const bend=(e.type==='bb'?18:e.type==='as'?10:6)/gScale;
+      const cx2=mx+Math.cos(perp)*bend,cy2=my+Math.sin(perp)*bend;
+
+      ctx.beginPath();ctx.moveTo(ex0,ey0);
+      ctx.quadraticCurveTo(cx2,cy2,ex1,ey1);
+      ctx.strokeStyle=col;ctx.lineWidth=lw;
+      if(e.type==='aa')ctx.setLineDash([6/gScale,3/gScale]);
+      else if(e.type==='sb'&&!e.collapsed)ctx.setLineDash([3/gScale,3/gScale]);
+      else ctx.setLineDash([]);
+      ctx.stroke();ctx.setLineDash([]);
+
+      // 화살표
       if(e.type==='aa'||e.type==='sb'||e.type==='as'){
-        const ang=Math.atan2(b.y-a.y,b.x-a.x);
-        const arrowX=b.x-b.r*Math.cos(ang),arrowY=b.y-b.r*Math.sin(ang);
-        const as2=7/gScale;
-        ctx.beginPath();ctx.moveTo(arrowX,arrowY);ctx.lineTo(arrowX-as2*Math.cos(ang-.42),arrowY-as2*Math.sin(ang-.42));ctx.lineTo(arrowX-as2*Math.cos(ang+.42),arrowY-as2*Math.sin(ang+.42));ctx.closePath();ctx.fillStyle=col;ctx.fill();
+        const as2=Math.max(4,6/gScale);
+        ctx.beginPath();ctx.moveTo(ex1,ey1);
+        ctx.lineTo(ex1-as2*Math.cos(ang0-.4),ey1-as2*Math.sin(ang0-.4));
+        ctx.lineTo(ex1-as2*Math.cos(ang0+.4),ey1-as2*Math.sin(ang0+.4));
+        ctx.closePath();ctx.fillStyle=col;ctx.fill();
+      }
+      if(isHover){
+        const mx2=(na.x+nb.x)/2,my2=(na.y+nb.y)/2;
+        ctx.font=`700 ${14/gScale}px sans-serif`;ctx.fillStyle='rgba(224,85,85,.9)';
+        ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('✂',mx2,my2-12/gScale);
       }
     });
-    // 연결 모드: 시작 노드에서 미리보기 링 표시
+
+    // 연결 모드 미리보기
     if(gMode==='connect'&&gConnectSrc){
       const n=gNodes.find(x=>x.id===gConnectSrc.id);
-      if(n){ctx.beginPath();ctx.arc(n.x,n.y,n.r+12,0,Math.PI*2);ctx.strokeStyle='rgba(212,168,83,.6)';ctx.lineWidth=2/gScale;ctx.setLineDash([4,4]);ctx.stroke();ctx.setLineDash([]);}
+      if(n){
+        ctx.beginPath();ctx.arc(n.x,n.y,n.r+14,0,Math.PI*2);
+        ctx.strokeStyle='rgba(212,168,83,.5)';ctx.lineWidth=2/gScale;
+        ctx.setLineDash([5/gScale,4/gScale]);ctx.stroke();ctx.setLineDash([]);
+      }
     }
-    gNodes.forEach(n=>{
-      if(n.type!=='step'){
-        // 글로우 halo
-        ctx.beginPath();ctx.arc(n.x,n.y,n.r+8,0,Math.PI*2);ctx.fillStyle=hex2rgba(n.color,n.sel?.18:.06);ctx.fill();
-        ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.fillStyle=n.sel?n.color:hex2rgba(n.color,.85);ctx.fill();
-        if(n.sel){ctx.strokeStyle='#fff';ctx.lineWidth=2/gScale;ctx.stroke();}
+
+    /* ═══════════════════════════════════════════
+       LAYER 3: 노드 렌더
+    ═══════════════════════════════════════════ */
+    // 렌더 순서: block → step → algo (algo가 맨 위)
+    const renderOrder=['block','step','algo'];
+    renderOrder.forEach(type=>{
+      gNodes.filter(n=>n.type===type).forEach(n=>{
+
+        /* ── Block: 세포 (Cell) ── */
         if(n.type==='block'){
-          // block: 원 옆에 레이블 pill 표시
-          const fullLabel=(() => {
-            const b=S.blocks.find(x=>x.id===n.id);
-            return b?b.content.slice(0,16):n.label;
-          })();
-          const lfs=Math.max(9,Math.min(12,n.r*.7));
-          ctx.font=`600 ${lfs}px Noto Sans KR,sans-serif`;
-          const lw=ctx.measureText(fullLabel).width;
-          // 텍스트를 원 오른쪽 or 왼쪽에 배치 (화면 중심 기준)
-          const toRight=n.x<0; // 변환된 좌표계에서 0이 중심
-          const tx=toRight?n.x+n.r+6:n.x-n.r-6;
-          const pillW=lw+10,pillH=lfs+8;
-          ctx.beginPath();
-          ctx.roundRect(toRight?tx:tx-pillW,n.y-pillH/2,pillW,pillH,4);
-          ctx.fillStyle='rgba(20,18,14,.75)';ctx.fill();
-          ctx.strokeStyle=hex2rgba(n.color,.35);ctx.lineWidth=.8/gScale;ctx.stroke();
-          ctx.fillStyle=n.sel?'#fff':hex2rgba('#fff',.85);
-          ctx.textAlign=toRight?'left':'right';ctx.textBaseline='middle';
-          ctx.fillText(fullLabel,toRight?tx+5:tx-5,n.y);
-          ctx.textAlign='center';
-        } else {
-          const fs=Math.max(7,Math.min(11,n.r*.55));ctx.font=`700 ${fs}px Noto Sans KR,sans-serif`;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(n.label,n.x,n.y);
+          // 외부 glow
+          const glowR=n.r+10;
+          const glowGrad=ctx.createRadialGradient(n.x,n.y,n.r*.5,n.x,n.y,glowR);
+          glowGrad.addColorStop(0,hex2rgba(n.color,n.sel?.25:.08));
+          glowGrad.addColorStop(1,'rgba(0,0,0,0)');
+          ctx.beginPath();ctx.arc(n.x,n.y,glowR,0,Math.PI*2);
+          ctx.fillStyle=glowGrad;ctx.fill();
+
+          // 세포 본체 — radial gradient (가장자리 더 짙게 = 세포막)
+          const cellGrad=ctx.createRadialGradient(n.x-n.r*.25,n.y-n.r*.25,0,n.x,n.y,n.r);
+          cellGrad.addColorStop(0,hex2rgba(n.color,n.sel?.95:.7));
+          cellGrad.addColorStop(0.6,hex2rgba(n.color,n.sel?.85:.62));
+          cellGrad.addColorStop(1,hex2rgba(n.color,n.sel?.9:.82));
+          ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+          ctx.fillStyle=cellGrad;ctx.fill();
+
+          // 세포막 테두리
+          ctx.strokeStyle=n.sel?'rgba(255,255,255,.9)':hex2rgba(n.color,.55);
+          ctx.lineWidth=(n.sel?2:1)/gScale;ctx.stroke();
+
+          // 하이라이트 (빛 반사)
+          const hlGrad=ctx.createRadialGradient(n.x-n.r*.3,n.y-n.r*.35,0,n.x-n.r*.1,n.y-n.r*.1,n.r*.6);
+          hlGrad.addColorStop(0,'rgba(255,255,255,.22)');
+          hlGrad.addColorStop(1,'rgba(255,255,255,0)');
+          ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+          ctx.fillStyle=hlGrad;ctx.fill();
+
+          // 레이블 pill (노드 옆)
+          const fullTxt=(()=>{const b=S.blocks.find(x=>x.id===n.id);return b?b.content:n.label;})();
+          const displayTxt=fullTxt.length>20?fullTxt.slice(0,20)+'…':fullTxt;
+          const lfs=Math.min(12,Math.max(9,11/Math.max(gScale,.6)));
+          ctx.font=`500 ${lfs}px Noto Sans KR,sans-serif`;
+          const lw2=ctx.measureText(displayTxt).width;
+          const toRight=n.x<screenCX;
+          const gap=n.r+6;
+          const pillW=lw2+12,pillH=lfs+9;
+          const px=toRight?n.x+gap:n.x-gap-pillW;
+          const py=n.y-pillH/2;
+          ctx.beginPath();ctx.roundRect(px,py,pillW,pillH,pillH/2);
+          ctx.fillStyle='rgba(10,9,8,.86)';ctx.fill();
+          ctx.strokeStyle=hex2rgba(n.color,n.sel?.6:.22);
+          ctx.lineWidth=.8/gScale;ctx.stroke();
+          ctx.fillStyle=n.sel?hex2rgba(n.color,1):'rgba(228,226,220,.9)';
+          ctx.textAlign='left';ctx.textBaseline='middle';
+          ctx.fillText(displayTxt,px+6,n.y);
+          ctx.textAlign='center';ctx.textBaseline='middle';
         }
-        if(n.type==='algo'){
-        // 외곽 링
-        ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.strokeStyle=hex2rgba('#fff',.35);ctx.lineWidth=1.5/gScale;ctx.stroke();
-        // algo 전체 제목을 아래에 표시 (pill)
-        {
-          const aTitle=(() => {const a=S.algorithms.find(x=>x.id===n.id);return a?a.title:'';})();
-          if(aTitle){
-            const atfs=Math.max(9,11/gScale);
-            ctx.font=`700 ${atfs}px Noto Sans KR,sans-serif`;
-            const atw=ctx.measureText(aTitle).width+10;
-            const atx=n.x-atw/2, aty=n.y+n.r+8/gScale;
-            ctx.beginPath();ctx.roundRect(atx,aty,atw,atfs*1.6,4);
-            ctx.fillStyle=hex2rgba(n.color,.18);ctx.fill();
-            ctx.strokeStyle=hex2rgba(n.color,.4);ctx.lineWidth=.8/gScale;ctx.stroke();
-            ctx.fillStyle=hex2rgba(n.color,1);ctx.textAlign='center';ctx.textBaseline='top';
-            ctx.fillText(aTitle,n.x,aty+atfs*.2);
-            ctx.textBaseline='middle';
+
+        /* ── Step: 세포 소기관 (Organelle) ── */
+        if(n.type==='step'){
+          const s2=n.r*1.2;
+          // 소기관 glow
+          if(n.sel||true){
+            const sGlow=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,s2+12);
+            sGlow.addColorStop(0,hex2rgba(n.color,n.sel?.2:.06));
+            sGlow.addColorStop(1,'rgba(0,0,0,0)');
+            ctx.beginPath();ctx.moveTo(n.x,n.y-(s2+12));ctx.lineTo(n.x+(s2+12),n.y);
+            ctx.lineTo(n.x,n.y+(s2+12));ctx.lineTo(n.x-(s2+12),n.y);ctx.closePath();
+            ctx.fillStyle=sGlow;ctx.fill();
+          }
+          // 접힌 상태 점선 외곽
+          if(n.collapsed){
+            ctx.beginPath();ctx.moveTo(n.x,n.y-(s2+6));ctx.lineTo(n.x+(s2+6),n.y);
+            ctx.lineTo(n.x,n.y+(s2+6));ctx.lineTo(n.x-(s2+6),n.y);ctx.closePath();
+            ctx.strokeStyle=hex2rgba(n.color,.4);ctx.lineWidth=1/gScale;
+            ctx.setLineDash([3/gScale,2/gScale]);ctx.stroke();ctx.setLineDash([]);
+          }
+          // 소기관 본체 — diamond
+          const orgGrad=ctx.createRadialGradient(n.x-n.r*.2,n.y-n.r*.2,0,n.x,n.y,s2);
+          orgGrad.addColorStop(0,hex2rgba(n.color,n.sel?.95:.78));
+          orgGrad.addColorStop(1,hex2rgba(n.color,n.sel?.85:.65));
+          ctx.beginPath();
+          ctx.moveTo(n.x,n.y-s2);ctx.lineTo(n.x+s2,n.y);
+          ctx.lineTo(n.x,n.y+s2);ctx.lineTo(n.x-s2,n.y);ctx.closePath();
+          ctx.fillStyle=orgGrad;ctx.fill();
+          ctx.strokeStyle=n.sel?'rgba(255,255,255,.8)':'rgba(255,255,255,.25)';
+          ctx.lineWidth=(n.sel?2:1)/gScale;ctx.stroke();
+          // 하이라이트
+          ctx.beginPath();ctx.moveTo(n.x,n.y-s2);ctx.lineTo(n.x+s2,n.y);
+          ctx.lineTo(n.x,n.y+s2);ctx.lineTo(n.x-s2,n.y);ctx.closePath();
+          const hlS=ctx.createRadialGradient(n.x-s2*.25,n.y-s2*.3,0,n.x,n.y,s2*.7);
+          hlS.addColorStop(0,'rgba(255,255,255,.2)');hlS.addColorStop(1,'rgba(255,255,255,0)');
+          ctx.fillStyle=hlS;ctx.fill();
+          // 번호 (핵 느낌)
+          const sfs=Math.max(8,Math.min(12,n.r*.75));
+          ctx.font=`700 ${sfs}px DM Mono,monospace`;
+          ctx.fillStyle='rgba(255,255,255,.95)';
+          ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText(n.stepOrder,n.x,n.y);
+          // 타이틀 pill
+          if(n.stepTitle){
+            const toRight2=n.x<screenCX;
+            const tfs=Math.min(11,Math.max(9,10/Math.max(gScale,.6)));
+            ctx.font=`500 ${tfs}px Noto Sans KR,sans-serif`;
+            const title=n.stepTitle.length>14?n.stepTitle.slice(0,14)+'…':n.stepTitle;
+            const tw=ctx.measureText(title).width+10;
+            const th=tfs+8;
+            const tx=toRight2?n.x+s2+5:n.x-s2-5-tw;
+            const ty=n.y-th/2;
+            ctx.beginPath();ctx.roundRect(tx,ty,tw,th,th/2);
+            ctx.fillStyle='rgba(10,9,8,.82)';ctx.fill();
+            ctx.strokeStyle=hex2rgba(n.color,.35);ctx.lineWidth=.7/gScale;ctx.stroke();
+            ctx.fillStyle='rgba(228,226,220,.85)';
+            ctx.textAlign='left';ctx.textBaseline='middle';
+            ctx.fillText(title,tx+5,n.y);
+            ctx.textAlign='center';ctx.textBaseline='middle';
           }
         }
-        if(n.collapsed){
-          // 접힌 상태: 점선 외곽 + 블록수·단계수 배지
-          ctx.beginPath();ctx.arc(n.x,n.y,n.r+6,0,Math.PI*2);ctx.strokeStyle=hex2rgba(n.color,.5);ctx.lineWidth=1.2/gScale;ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);
-          // 우상단 배지: "Ns Nb"
-          const badge=`${n.stepCount}s·${n.blockCount}b`;
-          const bfs=Math.max(6,8/gScale);
-          ctx.font=`600 ${bfs}px DM Mono,monospace`;
-          const bw=ctx.measureText(badge).width+8/gScale;
-          const bx=n.x+n.r*.55,by=n.y-n.r*.7;
-          ctx.beginPath();ctx.roundRect(bx-bw/2,by-bfs*.8,bw,bfs*1.6,3/gScale);
-          ctx.fillStyle=n.color;ctx.fill();
-          ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(badge,bx,by);
-          // ⊟ 아이콘 힌트
-          // ⊟ 힌트 생략 (제목 pill이 대신)
-        } else {
-          // 펼친 상태: ⊞ 힌트 (제목 아래)
-          // 힌트는 제목 pill 위에 표시 안 함 — 생략
+
+        /* ── Algorithm: 세포 핵 (Nucleus) ── */
+        if(n.type==='algo'){
+          // 핵 외부 halo (큰 글로우)
+          const nucHalo=ctx.createRadialGradient(n.x,n.y,n.r,n.x,n.y,n.r+20);
+          nucHalo.addColorStop(0,hex2rgba(n.color,n.sel?.35:.15));
+          nucHalo.addColorStop(1,'rgba(0,0,0,0)');
+          ctx.beginPath();ctx.arc(n.x,n.y,n.r+20,0,Math.PI*2);
+          ctx.fillStyle=nucHalo;ctx.fill();
+
+          // 접힌 상태: 점선 외막
+          if(n.collapsed){
+            ctx.beginPath();ctx.arc(n.x,n.y,n.r+8,0,Math.PI*2);
+            ctx.strokeStyle=hex2rgba(n.color,.4);ctx.lineWidth=1.2/gScale;
+            ctx.setLineDash([5/gScale,3/gScale]);ctx.stroke();ctx.setLineDash([]);
+          }
+
+          // 핵막 (Nuclear envelope) - 이중막
+          ctx.beginPath();ctx.arc(n.x,n.y,n.r+2,0,Math.PI*2);
+          ctx.strokeStyle=hex2rgba(n.color,.5);ctx.lineWidth=2/gScale;ctx.stroke();
+          ctx.beginPath();ctx.arc(n.x,n.y,n.r-2,0,Math.PI*2);
+          ctx.strokeStyle=hex2rgba(n.color,.25);ctx.lineWidth=1/gScale;ctx.stroke();
+
+          // 핵 본체 (가운데 밝고 가장자리 어두운 gradient)
+          const nucGrad=ctx.createRadialGradient(n.x-n.r*.2,n.y-n.r*.25,0,n.x,n.y,n.r);
+          nucGrad.addColorStop(0,hex2rgba(n.color,n.sel?1:.72));
+          nucGrad.addColorStop(0.5,hex2rgba(n.color,n.sel?.92:.60));
+          nucGrad.addColorStop(1,hex2rgba(n.color,n.sel?.75:.45));
+          ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+          ctx.fillStyle=nucGrad;ctx.fill();
+          if(n.sel){ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=2.5/gScale;ctx.stroke();}
+
+          // 핵인 (Nucleolus) - 중심 작은 원
+          const nlR=n.r*.3;
+          ctx.beginPath();ctx.arc(n.x,n.y,nlR,0,Math.PI*2);
+          ctx.fillStyle=hex2rgba('#ffffff',.18);ctx.fill();
+
+          // 하이라이트
+          const nhl=ctx.createRadialGradient(n.x-n.r*.3,n.y-n.r*.35,0,n.x,n.y,n.r*.8);
+          nhl.addColorStop(0,'rgba(255,255,255,.28)');nhl.addColorStop(1,'rgba(255,255,255,0)');
+          ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.fillStyle=nhl;ctx.fill();
+
+          // 접힌 배지
+          if(n.collapsed){
+            const badge=`${n.stepCount}s·${n.blockCount}b`;
+            const bfs=Math.max(7,8/gScale);
+            ctx.font=`600 ${bfs}px DM Mono,monospace`;
+            const bw=ctx.measureText(badge).width+8/gScale;
+            const bx=n.x+n.r*.5,by=n.y-n.r*.65;
+            ctx.beginPath();ctx.roundRect(bx-bw/2,by-bfs*.8,bw,bfs*1.7,3/gScale);
+            ctx.fillStyle=n.color;ctx.fill();
+            ctx.fillStyle='rgba(0,0,0,.85)';
+            ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(badge,bx,by);
+          }
+
+          // 제목 pill (핵 옆)
+          const aObj=S.algorithms.find(x=>x.id===n.id);
+          const aTitle=aObj?aObj.title:'';
+          if(aTitle){
+            const toRight=n.x<screenCX;
+            const atfs=Math.min(13,Math.max(10,12/Math.max(gScale,.5)));
+            ctx.font=`700 ${atfs}px Noto Sans KR,sans-serif`;
+            const atw=ctx.measureText(aTitle).width+14;
+            const ath=atfs+11;
+            const atx=toRight?n.x+n.r+8:n.x-n.r-8-atw;
+            const aty=n.y-ath/2;
+            ctx.beginPath();ctx.roundRect(atx,aty,atw,ath,ath/2);
+            ctx.fillStyle=hex2rgba(n.color,.18);ctx.fill();
+            ctx.strokeStyle=hex2rgba(n.color,.55);ctx.lineWidth=1.2/gScale;ctx.stroke();
+            ctx.fillStyle=hex2rgba(n.color,1);
+            ctx.textAlign='left';ctx.textBaseline='middle';
+            ctx.fillText(aTitle,atx+7,n.y);
+            ctx.textAlign='center';ctx.textBaseline='middle';
+          }
         }
-      }
-      // block 접기 힌트 (링크가 있을 때)
-      if(n.type==='block'&&n.linkCount>0){
-        ctx.font=`700 ${Math.max(6,8/gScale)}px sans-serif`;
-        ctx.fillStyle=n.collapsed?'rgba(255,255,255,.65)':'rgba(255,255,255,.28)';
-        ctx.textAlign='center';ctx.textBaseline='middle';
-        ctx.fillText(n.collapsed?'⊟':'⊞',n.x,n.y+n.r+9/gScale);
-      }
-      }
-      if(n.type==='step'){
-        const s2=n.r*1.15;
-        // 접힌 상태면 점선 외곽 강조
-        if(n.collapsed){
-          ctx.beginPath();ctx.moveTo(n.x,n.y-(s2+5));ctx.lineTo(n.x+(s2+5),n.y);ctx.lineTo(n.x,n.y+(s2+5));ctx.lineTo(n.x-(s2+5),n.y);ctx.closePath();
-          ctx.strokeStyle=hex2rgba(n.color,.55);ctx.lineWidth=1.2/gScale;ctx.setLineDash([3,2]);ctx.stroke();ctx.setLineDash([]);
-        }
-        // 글로우 halo
-        if(n.sel){
-          ctx.beginPath();ctx.moveTo(n.x,n.y-(s2+7));ctx.lineTo(n.x+(s2+7),n.y);ctx.lineTo(n.x,n.y+(s2+7));ctx.lineTo(n.x-(s2+7),n.y);ctx.closePath();
-          ctx.fillStyle=hex2rgba(n.color,.2);ctx.fill();
-        }
-        // 다이아몬드
-        ctx.beginPath();
-        ctx.moveTo(n.x, n.y-s2);ctx.lineTo(n.x+s2, n.y);ctx.lineTo(n.x, n.y+s2);ctx.lineTo(n.x-s2, n.y);
-        ctx.closePath();
-        ctx.fillStyle=n.sel?n.color:hex2rgba(n.color,.88);ctx.fill();
-        ctx.strokeStyle=n.sel?'#fff':'rgba(255,255,255,.3)';ctx.lineWidth=(n.sel?2:1)/gScale;ctx.stroke();
-        // 번호
-        const sfs=Math.max(8,Math.min(13,n.r*.8));
-        ctx.font=`700 ${sfs}px DM Mono,monospace`;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';
-        ctx.fillText(n.stepOrder,n.x,n.y);
-        // step 타이틀: 다이아몬드 아래 작은 레이블
-        if(n.stepTitle){
-          const tfs=Math.max(8,10/gScale);
-          ctx.font=`600 ${tfs}px Noto Sans KR,sans-serif`;
-          const title=n.stepTitle.slice(0,10);
-          const tw=ctx.measureText(title).width+8;
-          const tx=n.x-tw/2,ty=n.y+s2+6/gScale;
-          ctx.beginPath();ctx.roundRect(tx,ty,tw,tfs*1.5,3);
-          ctx.fillStyle='rgba(20,18,14,.72)';ctx.fill();
-          ctx.fillStyle='rgba(255,255,255,.75)';ctx.textAlign='center';ctx.textBaseline='top';
-          ctx.fillText(title,n.x,ty+tfs*.2);
-          ctx.textBaseline='middle';
-        }
-        // 접기 힌트
-        ctx.font=`700 ${Math.max(6,8/gScale)}px sans-serif`;
-        ctx.fillStyle=n.collapsed?'rgba(255,255,255,.65)':'rgba(255,255,255,.28)';
-        ctx.textAlign='center';ctx.textBaseline='middle';
-        ctx.fillText(n.collapsed?'⊟':'⊞',n.x,n.y+s2+9/gScale);
-      }
+      });
     });
     ctx.restore();
   }
