@@ -118,11 +118,11 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Noto Sa
 .pill:active{transform:scale(.95);}
 
 /* ── FORM ── */
-.ibox{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);padding:16px;margin-bottom:12px;}
+.ibox{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);padding:16px;margin-bottom:12px;overflow:visible;}
 .ibox:hover{border-color:var(--bdr2);}
 .ilabel{font-size:11px;color:var(--txt3);font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-bottom:7px;}
 textarea,input[type=text],select{font-family:'Noto Sans KR',sans-serif;font-size:16px;}
-textarea{width:100%;background:transparent;border:none;outline:none;color:var(--txt);font-size:15px;resize:none;line-height:1.7;field-sizing:content;min-height:60px;overflow-y:hidden;}
+textarea{width:100%;background:transparent;border:none;outline:none;color:var(--txt);font-size:15px;resize:none;line-height:1.7;field-sizing:content;min-height:60px;overflow-y:hidden;-webkit-overflow-scrolling:touch;}
 input[type=text]{width:100%;background:transparent;border:none;outline:none;color:var(--txt);font-size:15px;line-height:1.7;}
 input::placeholder,textarea::placeholder{color:var(--txt3);}
 select{width:100%;background:var(--sur2);color:var(--txt);border:1px solid var(--bdr);border-radius:10px;padding:11px 12px;font-size:15px;outline:none;-webkit-appearance:none;cursor:pointer;}
@@ -191,8 +191,8 @@ select:hover{border-color:var(--bdr2);}
 .step-block-tag button{background:none;border:none;color:var(--acc2);cursor:pointer;padding:0;font-size:13px;line-height:1;opacity:.7;}
 .step-block-tag button:hover{opacity:1;}
 .step-block-add-row{display:flex;gap:6px;align-items:center;}
-.step-block-search{flex:1;font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid var(--bdr);background:var(--sur3);color:var(--txt1);}
-.step-block-dropdown{position:absolute;z-index:200;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.3);max-height:180px;overflow-y:auto;min-width:220px;}
+.step-block-search{flex:1;font-size:16px;padding:4px 8px;border-radius:6px;border:1px solid var(--bdr);background:var(--sur3);color:var(--txt1);}
+.step-block-dropdown{position:absolute;z-index:250;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);max-height:180px;overflow-y:auto;width:100%;left:0;right:0;-webkit-overflow-scrolling:touch;}
 .step-block-opt{padding:7px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--bdr);}
 .step-block-opt:last-child{border-bottom:none;}
 .step-block-opt:hover{background:var(--sur3);}
@@ -222,14 +222,14 @@ select:hover{border-color:var(--bdr2);}
 .expr-dot{width:7px;height:7px;border-radius:50%;background:var(--acc);flex-shrink:0;}
 
 /* ── GRAPH ── */
-.graph-toolbar{display:flex;gap:6px;padding:10px 16px;background:var(--sur);border-bottom:1px solid var(--bdr);flex-wrap:wrap;align-items:center;}
+.graph-toolbar{display:flex;gap:6px;padding:8px 12px;background:var(--sur);border-bottom:1px solid var(--bdr);flex-wrap:wrap;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .zoom-display{font-family:'DM Mono',monospace;font-size:12px;color:var(--txt3);padding:4px 8px;background:var(--sur2);border-radius:6px;border:1px solid var(--bdr);}
 #gcanvas{flex:1;display:block;touch-action:none;cursor:grab;width:100%;}
 #gcanvas.grabbing{cursor:grabbing;}
-.graph-legend{display:flex;flex-wrap:wrap;gap:10px;padding:10px 16px;background:var(--sur);border-top:1px solid var(--bdr);}
+.graph-legend{display:flex;flex-wrap:wrap;gap:6px 10px;padding:8px 12px;background:var(--sur);border-top:1px solid var(--bdr);overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .gl-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--txt2);}
 .gl-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
-#ginfo-panel{padding:12px 16px;background:var(--sur2);border-top:2px solid var(--bdr2);font-size:13px;color:var(--txt2);display:none;flex-direction:column;max-height:200px;overflow-y:auto;flex-shrink:0;}
+#ginfo-panel{padding:12px 16px;background:var(--sur2);border-top:2px solid var(--bdr2);font-size:13px;color:var(--txt2);display:none;flex-direction:column;max-height:min(200px,35vh);overflow-y:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;}
 
 /* ── HOME ── */
 .home-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:20px;}
@@ -300,7 +300,7 @@ select:hover{border-color:var(--bdr2);}
   .two-col{grid-template-columns:1fr;height:auto;}
   .two-col .col-left,.two-col .col-right{border:none;padding:0;}
   .page,.graph-page{height:auto;}
-  .graph-page.on{height:100vh;position:fixed;inset:0;top:var(--nh);bottom:var(--th);z-index:10;}
+  .graph-page.on{height:auto;position:fixed;inset:0;top:var(--nh);bottom:calc(var(--th) + env(safe-area-inset-bottom));z-index:10;}
   .page{padding-top:calc(var(--nh) + 4px);}
   .sec{padding:0 14px calc(var(--th) + env(safe-area-inset-bottom) + 32px);}
   .home-grid{grid-template-columns:1fr;padding:14px;}
@@ -316,6 +316,19 @@ select:hover{border-color:var(--bdr2);}
   .home-grid{padding-bottom:calc(var(--th) + env(safe-area-inset-bottom) + 16px);}
   .two-col .col-left,
   .two-col .col-right{padding-bottom:calc(var(--th) + env(safe-area-inset-bottom) + 16px);}
+  .graph-toolbar{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 10px;gap:4px;}
+  .graph-toolbar .pill-row{flex-wrap:nowrap;gap:2px;}
+  .graph-toolbar .pill{white-space:nowrap;padding:5px 8px;font-size:10px;}
+  .graph-legend{padding:6px 10px;}
+  .gl-item{font-size:10px;}
+  /* step-block 검색 드롭다운 위에 열리게 (키보드 가림 방지) */
+  .step-block-dropdown{bottom:100%;top:auto;margin-bottom:4px;margin-top:0;}
+  /* 모달 내 체크박스 리스트 터치 스크롤 */
+  #step-block-chk{-webkit-overflow-scrolling:touch;}
+  /* 알고리즘 step 편집창 터치 영역 확대 */
+  .step-row-top input[type=text]{min-height:44px;}
+  /* btn 터치 영역 최소 44px */
+  .btn-sm{min-height:36px;}
 }
 
 @media(min-width:769px) and (max-width:1100px){
@@ -583,8 +596,10 @@ select:hover{border-color:var(--bdr2);}
     <div class="graph-legend">
       <div class="gl-item"><div class="gl-dot" style="background:#d4a853"></div>Block</div>
       <div class="gl-item"><div class="gl-dot" style="background:#e0853c"></div>Algorithm</div>
+      <div class="gl-item"><div class="gl-dot" style="background:#c47a28;border:1.5px dashed rgba(196,122,40,.6)"></div>Step</div>
       <div class="gl-item"><div class="gl-dot" style="background:rgba(212,168,83,.4);border:1.5px solid #d4a853"></div>B↔B</div>
       <div class="gl-item"><div class="gl-dot" style="background:rgba(121,184,119,.4);border:1.5px solid #79b877"></div>A→A</div>
+      <div class="gl-item"><div class="gl-dot" style="background:rgba(196,122,40,.4);border:1.5px solid #c47a28"></div>A→Step</div>
       <div class="gl-item"><div class="gl-dot" style="background:rgba(224,133,60,.4);border:1.5px solid #e0853c"></div>Step→B</div>
     </div>
   </div>
@@ -846,7 +861,7 @@ function showTokenModal_kans4() {
         GitHub Personal Access Token을 입력하면<br>폰·컴퓨터 간 데이터가 자동 동기화돼요.
       </div>
       <input id="kans4-token-input" type="password" placeholder="ghp_xxxxxxxxxxxx"
-        style="width:100%;padding:12px;background:#222;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#f2ede5;font-size:14px;margin-bottom:12px"
+        style="width:100%;padding:12px;background:#222;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#f2ede5;font-size:16px;margin-bottom:12px"
         value="${existing}">
       <div style="display:flex;gap:8px">
         <button onclick="saveToken_kans4()" style="flex:1;padding:11px;background:rgba(212,168,83,.18);border:1px solid rgba(212,168,83,.5);border-radius:8px;color:#d4a853;font-size:14px;cursor:pointer;font-weight:700">저장</button>
@@ -887,80 +902,6 @@ function updateStats(){
 const PAGE_TITLES={home:'Home',memo:'Memo · Blocks',groups:'Groups',algorithm:'Algorithm',expression:'Expression',graph:'Graph'};
 let curPage='home',rafId=null;
 const isMobile=()=>window.innerWidth<=768;
-
-function goPage(name,navEl){
-  document.querySelectorAll('.page,.graph-page').forEach(p=>p.classList.remove('on'));
-  document.getElementById('page-nested')?.classList.remove('on');
-  document.querySelectorAll('.snav-item,.tab').forEach(el=>el.classList.remove('on'));
-  const pg=document.getElementById('page-'+name);
-  if(pg)pg.classList.add('on');
-  document.querySelectorAll(`[data-page="${name}"]`).forEach(el=>el.classList.add('on'));
-  if(navEl)navEl.classList.add('on');
-  const tt=document.getElementById('topbar-title');
-  if(tt)tt.textContent=PAGE_TITLES[name]||name;
-  if(rafId){cancelAnimationFrame(rafId);rafId=null;}
-  curPage=name;
-  const fab=document.getElementById('fab');
-  if(fab)fab.style.display=(isMobile()&&name!=='graph')?'flex':'none';
-  if(name==='graph'){
-    if(!isMobile()){
-      const pg2=document.getElementById('page-graph');
-      pg2.style.height='';
-    }
-  }
-  const renders={
-    home:renderHome,
-    memo:()=>{blockFilter='all';syncFilterPills();renderBlockList();renderGroupSelect();},
-    groups:renderGroupList,
-    algorithm:()=>{renderSteps();renderAlgoLinkChk();renderAlgoList();},
-    expression:()=>{renderExprAlgoChk();renderExprList();},
-    graph:renderGraph,
-  };
-  if(renders[name])renders[name]();
-}
-
-function fabAction(){
-  const map={home:'memo',memo:'memo',groups:'groups',algorithm:'algorithm',expression:'expression'};
-  const dest=map[curPage]||'memo';
-  const t=document.querySelector(`.tab[data-page="${dest}"]`);
-  if(t)t.click();
-}
-
-/* ── HOME ── */
-function renderHome(){
-  const recentB=S.blocks.slice(-4).reverse();
-  const recentA=S.algorithms.slice(-4).reverse();
-  // 고아 블록: 그룹X + 연결X + 알고리즘에서 미사용
-  const orphans=S.blocks.filter(b=>{
-    const noGroup=!b.groupId;
-    const noLinks=!(b.links||[]).length&&!S.blocks.some(x=>(x.links||[]).includes(b.id));
-    const noAlgo=!S.algorithms.some(a=>a.steps.some(s=>(s.blockIds||[]).includes(b.id)));
-    return noGroup&&noLinks&&noAlgo;
-  });
-  const orphanHtml=orphans.length?`
-  <div style="background:var(--sur2);border:1.5px solid rgba(224,133,60,.3);border-radius:12px;padding:14px 16px;margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-      <span style="font-size:14px">🔍</span>
-      <span style="font-size:12px;font-weight:700;color:#e0853c;font-family:DM Mono,monospace;letter-spacing:.5px">정리 안 된 블록 ${orphans.length}개</span>
-      <span style="font-size:11px;color:var(--txt3);margin-left:auto">그룹·연결·알고리즘 없음</span>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:5px">
-      ${orphans.slice(0,3).map(b=>`<div onclick="viewBlock('${b.id}')" style="background:var(--sur3);border-radius:7px;padding:8px 11px;cursor:pointer;font-size:12px;color:var(--txt2);line-height:1.4;transition:color .15s" onmouseover="this.style.color='var(--txt)'" onmouseout="this.style.color='var(--txt2)'">${esc(b.content.slice(0,60))}${b.content.length>60?'…':''}</div>`).join('')}
-      ${orphans.length>3?`<div style="font-size:11px;color:var(--txt3);font-family:DM Mono,monospace;padding:4px 2px">+ ${orphans.length-3}개 더</div>`:''}
-    </div>
-  </div>`:'';
-
-  document.getElementById('home-recent-blocks').innerHTML=recentB.length
-    ?recentB.map(b=>`<div class="card" onclick="viewBlock('${b.id}')"><div class="card-title">${esc(b.content.slice(0,44))}</div><div class="card-tags"><span class="btype ${b.type}">${b.type}</span></div></div>`).join('')
-    :'<div class="empty">아직 Block이 없어요</div>';
-  document.getElementById('home-recent-algos').innerHTML=recentA.length
-    ?recentA.map(a=>`<div class="card" onclick="viewAlgo('${a.id}')"><div class="card-title">${esc(a.title)}</div><div class="card-sub">${a.steps.length}단계</div><div class="card-tags">${(a.tags||[]).map(t=>`<span class="tag ac">${esc(t)}</span>`).join('')}</div></div>`).join('')
-    :'<div class="empty">아직 Algorithm이 없어요</div>';
-
-  // 고아 블록 배너 삽입
-  const orphanEl=document.getElementById('home-orphan-banner');
-  if(orphanEl)orphanEl.innerHTML=orphanHtml;
-}
 
 function goPage(name,navEl){
   document.querySelectorAll('.page,.graph-page').forEach(p=>p.classList.remove('on'));
@@ -1207,7 +1148,7 @@ function renderSteps(preVals,preBlockIds){
     row.innerHTML=`
       <div class="step-row-top">
         <div class="step-num-edit">${i+1}</div>
-        <input type="text" id="step-inp-${i}" placeholder="\ub2e8\uacc4 ${i+1}" style="flex:1;font-size:14px">
+        <input type="text" id="step-inp-${i}" placeholder="\ub2e8\uacc4 ${i+1}" style="flex:1;font-size:16px">
         ${stepCount>1?`<button onclick="removeStep(${i})" style="background:none;border:none;color:var(--txt3);font-size:22px;cursor:pointer;padding:0 4px;line-height:1;transition:color .15s" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--txt3)'">\xd7</button>`:''}
       </div>
       <div class="step-block-editor">
@@ -1335,7 +1276,7 @@ function openStepLinker(algoId,si){
       <div class="modal-close" onclick="viewAlgo('${algoId}')">✕</div>
     </div>
     <div style="font-size:14px;color:var(--txt2);margin-bottom:14px">${esc(s.title)}</div>
-    <input id="step-linker-search" type="text" placeholder="🔍 블록 검색..." style="width:100%;box-sizing:border-box;margin-bottom:10px;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--bdr);background:var(--sur3);color:var(--txt1);" oninput="(()=>{const q=this.value.trim().toLowerCase();const chkEl=document.getElementById('step-block-chk');if(!chkEl)return;const filtered=S.blocks.filter(b=>!q||b.content.toLowerCase().includes(q)||b.type.toLowerCase().includes(q));chkEl.innerHTML=filtered.length?filtered.map(b=>\`<div class='chk-item'><input type='checkbox' id='sbc-\${b.id}' value='\${b.id}' style='accent-color:var(--acc2)'\${(a.steps[${si}].blockIds||[]).includes(b.id)?' checked':''}><label for='sbc-\${b.id}'>\${esc(b.content.slice(0,48))}<br><span style='font-size:11px;color:var(--txt3)'>\${b.type}</span></label></div>\`).join(''):'<div style=\'color:var(--txt3);font-size:13px;padding:8px 0\'>블록 없음</div>';})()">
+    <input id="step-linker-search" type="text" placeholder="🔍 블록 검색..." style="width:100%;box-sizing:border-box;margin-bottom:10px;font-size:16px;padding:7px 10px;border-radius:8px;border:1px solid var(--bdr);background:var(--sur3);color:var(--txt1);" oninput="(()=>{const q=this.value.trim().toLowerCase();const chkEl=document.getElementById('step-block-chk');if(!chkEl)return;const filtered=S.blocks.filter(b=>!q||b.content.toLowerCase().includes(q)||b.type.toLowerCase().includes(q));chkEl.innerHTML=filtered.length?filtered.map(b=>\`<div class='chk-item'><input type='checkbox' id='sbc-\${b.id}' value='\${b.id}' style='accent-color:var(--acc2)'\${((()=>{const _xa=S.algorithms.find(x=>x.id==='${algoId}');return _xa&&_xa.steps[${si}]&&(_xa.steps[${si}].blockIds||[]).includes(b.id);})()?' checked':'')}><label for='sbc-\${b.id}'>\${esc(b.content.slice(0,48))}<br><span style='font-size:11px;color:var(--txt3)'>\${b.type}</span></label></div>\`).join(''):'<div style=\'color:var(--txt3);font-size:13px;padding:8px 0\'>블록 없음</div>';})()">
     <div id="step-block-chk" style="max-height:220px;overflow-y:auto;margin-bottom:12px">${S.blocks.map(b=>`<div class="chk-item"><input type="checkbox" id="sbc-${b.id}" value="${b.id}" style="accent-color:var(--acc2)"${(s.blockIds||[]).includes(b.id)?' checked':''}><label for="sbc-${b.id}">${esc(b.content.slice(0,48))}<br><span style="font-size:11px;color:var(--txt3)">${b.type}</span></label></div>`).join('')}</div>
     <div style="border-top:1px solid var(--bdr);padding-top:12px;margin-bottom:12px">
       <div style="font-size:12px;color:var(--txt3);margin-bottom:7px;font-weight:600;letter-spacing:.04em">＋ 새 블록 생성 후 연결</div>
@@ -1343,7 +1284,7 @@ function openStepLinker(algoId,si){
         <option value="관찰">관찰</option><option value="공부" selected>공부</option><option value="강의">강의</option><option value="경험">경험</option>
       </select>
       <div style="display:flex;gap:6px">
-        <input id="step-new-block-content" type="text" placeholder="새 블록 내용 입력..." style="flex:1;font-size:13px;padding:6px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--sur3);color:var(--txt1);"
+        <input id="step-new-block-content" type="text" placeholder="새 블록 내용 입력..." style="flex:1;font-size:16px;padding:6px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--sur3);color:var(--txt1);"
           onkeydown="if(event.key==='Enter')createBlockInLinker('${algoId}',${si})">
         <button class="btn btn-g btn-sm" style="color:var(--acc3);border-color:rgba(63,255,162,.3);white-space:nowrap" onclick="createBlockInLinker('${algoId}',${si})">생성 & 연결</button>
       </div>
@@ -1482,7 +1423,7 @@ function showExprEdit(id){
       <div class="modal-title">Expression 편집</div>
       <div class="modal-close" onclick="viewExpr('${e.id}')">✕</div>
     </div>
-    <input id="expr-edit-title" type="text" value="${esc(e.title)}" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px;color:var(--txt);font-size:14px;font-weight:600;outline:none;margin-bottom:10px;font-size:16px">
+    <input id="expr-edit-title" type="text" value="${esc(e.title)}" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px;color:var(--txt);font-size:16px;font-weight:600;outline:none;margin-bottom:10px;font-size:16px">
     <textarea id="expr-edit-conclusion" placeholder="결론 / 핵심 인사이트" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px;color:var(--txt);font-size:13px;line-height:1.6;min-height:80px;field-sizing:content;margin-bottom:10px" oninput="autoResize(this)">${esc(e.conclusion||'')}</textarea>
     <textarea id="expr-edit-context" placeholder="적용 맥락 (언제, 어떤 상황에서 쓰는가)" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px;color:var(--txt);font-size:13px;line-height:1.6;min-height:60px;field-sizing:content;margin-bottom:12px" oninput="autoResize(this)">${esc(e.context||'')}</textarea>
     <div class="row">
@@ -1507,7 +1448,7 @@ let gNodes=[],gEdges=[];
 let gScale=1,gOffX=0,gOffY=0;
 let gDrag=null,gPan=false,gPanStart={x:0,y:0},gPanOff={x:0,y:0};
 let gPinchStart=0,gDpr=1,gW=0,gH=0,gFilterMode='all',gPhysicsTick=0;
-const GRAPH_EDGE_COLORS={bb:'rgba(212,168,83,.5)',aa:'rgba(121,184,119,.55)',sb:'rgba(224,133,60,.5)'};
+const GRAPH_EDGE_COLORS={bb:'rgba(212,168,83,.5)',aa:'rgba(121,184,119,.55)',sb:'rgba(224,133,60,.4)',as:'rgba(196,122,40,.65)'};
 let gMode='move'; // 'move' | 'connect' | 'cut'
 let _gResizeObs=null;
 let gViewMode='graph'; // 'graph' | 'nested' | 'rumsfeld'
@@ -1998,7 +1939,6 @@ function buildGraphData(){
     const g=S.groups.find(x=>x.id===b.groupId);
     const finalAng=(i/bLen)*Math.PI*2;
     const baseR=Math.min(gW,gH)*.38;
-    // 연결 수에 따라 노드 크기 조정 (연결 많을수록 크게)
     const linkCount=(b.links||[]).length+S.blocks.filter(x=>(x.links||[]).includes(b.id)).length;
     const r=14+Math.min(linkCount*2,10);
     gNodes.push({id:b.id,label:b.content.slice(0,8),x:gW/2+baseR*Math.cos(finalAng),y:gH/2+baseR*Math.sin(finalAng),r,type:'block',vx:0,vy:0,sel:false,color:g?g.color:'#d4a853',groupId:b.groupId,linkCount});
@@ -2006,6 +1946,20 @@ function buildGraphData(){
   S.algorithms.forEach((a,i)=>{
     const ang=(i/aLen)*Math.PI*2+.5,r2=Math.min(gW,gH)*.16;
     gNodes.push({id:a.id,label:a.title.slice(0,7),x:gW/2+r2*Math.cos(ang),y:gH/2+r2*Math.sin(ang),r:20,type:'algo',vx:0,vy:0,sel:false,color:'#e0853c',groupId:'',linkCount:0});
+    // 단계(Step) 노드를 알고리즘과 블록 사이에 생성
+    a.steps.forEach((s,si)=>{
+      const stepId='step_'+a.id+'_'+si;
+      const stepAng=ang+((si-(a.steps.length-1)/2)*0.35);
+      const stepR=r2+80;
+      gNodes.push({
+        id:stepId, label:(s.order)+'.'+(s.title.slice(0,6)),
+        x:gW/2+stepR*Math.cos(stepAng), y:gH/2+stepR*Math.sin(stepAng),
+        r:13, type:'step', vx:0,vy:0,sel:false,
+        color:'#c47a28', groupId:'', algoId:a.id, stepOrder:s.order, stepTitle:s.title
+      });
+      gEdges.push({from:a.id,to:stepId,type:'as',weight:1,stepOrder:s.order});
+      (s.blockIds||[]).forEach(bid=>gEdges.push({from:stepId,to:bid,type:'sb',weight:1}));
+    });
   });
   // 엣지 — weight: 공유 알고리즘 수
   S.blocks.forEach(b=>{
@@ -2017,7 +1971,7 @@ function buildGraphData(){
   });
   S.algorithms.forEach(a=>{
     (a.linkedAlgoIds||[]).forEach(lid=>gEdges.push({from:a.id,to:lid,type:'aa',weight:1}));
-    a.steps.forEach(s=>(s.blockIds||[]).forEach(bid=>gEdges.push({from:a.id,to:bid,type:'sb',weight:1})));
+    // 기존 algo→block 직접 연결 제거 (step 노드로 대체됨)
   });
   gPhysicsTick=0;
 }
@@ -2075,7 +2029,7 @@ function runGraphLoop(cv){
       let totalKE=0;
       gNodes.forEach(n=>{
         // 모든 노드 간 반발력 — 충분한 간격 확보
-        gNodes.forEach(m=>{if(n===m)return;const dx=n.x-m.x,dy=n.y-m.y,d=Math.sqrt(dx*dx+dy*dy)||1;const minDist=(n.r+m.r)*3.2;const f=d<minDist?Math.min(5000/(d*d),18):Math.min(1800/(d*d),4);n.vx+=f*(dx/d);n.vy+=f*(dy/d);});
+        gNodes.forEach(m=>{if(n===m)return;const dx=n.x-m.x,dy=n.y-m.y,d=Math.sqrt(dx*dx+dy*dy)||1;const minDist=(n.r+m.r)*(n.type==='step'||m.type==='step'?2.0:3.2);const fMax=n.type==='step'||m.type==='step'?8:18;const fMax2=n.type==='step'||m.type==='step'?2:4;const f=d<minDist?Math.min(5000/(d*d),fMax):Math.min(1800/(d*d),fMax2);n.vx+=f*(dx/d);n.vy+=f*(dy/d);});
         // 중심 인력 (약하게)
         n.vx+=(gW/2-n.x)*.0012;n.vy+=(gH/2-n.y)*.0012;
         // 같은 그룹끼리 뭉치기 (클러스터링)
@@ -2084,7 +2038,7 @@ function runGraphLoop(cv){
         const pad=40;n.x=Math.max(pad,Math.min(gW-pad,n.x));n.y=Math.max(pad,Math.min(gH-pad,n.y));
         totalKE+=n.vx*n.vx+n.vy*n.vy;
       });
-      gEdges.forEach(e=>{const a=gNodes.find(n=>n.id===e.from),b=gNodes.find(n=>n.id===e.to);if(!a||!b)return;const dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1;const idealLen=e.type==='bb'?150:190;const f=(d-idealLen)*.022;a.vx+=f*(dx/d);a.vy+=f*(dy/d);b.vx-=f*(dx/d);b.vy-=f*(dy/d);});
+      gEdges.forEach(e=>{const a=gNodes.find(n=>n.id===e.from),b=gNodes.find(n=>n.id===e.to);if(!a||!b)return;const dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1;const idealLen=e.type==='bb'?150:e.type==='as'?80:e.type==='sb'?110:190;const strength=e.type==='as'?0.04:0.022;const f=(d-idealLen)*strength;a.vx+=f*(dx/d);a.vy+=f*(dy/d);b.vx-=f*(dx/d);b.vy-=f*(dy/d);});
       gPhysicsTick++;
       // 운동에너지가 충분히 작아지면 시뮬레이션 조기 종료
       if(totalKE/Math.max(1,gNodes.length)<0.08)gPhysicsTick=9999;
@@ -2105,7 +2059,7 @@ function runGraphLoop(cv){
       const w=isHover?Math.max(2,3/gScale):Math.max(.8,(1+Math.min((e.weight||1)-1,.8)*.8)*1.5/gScale);
       ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.strokeStyle=col;ctx.lineWidth=w;ctx.setLineDash(isHover?[4,4]:(e.type==='bb'?[]:(e.type==='aa'?[6,3]:[3,3])));ctx.stroke();ctx.setLineDash([]);
       if(isHover){const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;ctx.font=`700 ${14/gScale}px Noto Sans KR,sans-serif`;ctx.fillStyle='rgba(224,85,85,.9)';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('✂',mx,my-10/gScale);}
-      if(e.type==='aa'||e.type==='sb'){const ang=Math.atan2(b.y-a.y,b.x-a.x);const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;const as=8/gScale;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(mx-as*Math.cos(ang-.4),my-as*Math.sin(ang-.4));ctx.lineTo(mx-as*Math.cos(ang+.4),my-as*Math.sin(ang+.4));ctx.closePath();ctx.fillStyle=col;ctx.fill();}
+      if(e.type==='aa'||e.type==='sb'||e.type==='as'){const ang=Math.atan2(b.y-a.y,b.x-a.x);const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;const as=8/gScale;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(mx-as*Math.cos(ang-.4),my-as*Math.sin(ang-.4));ctx.lineTo(mx-as*Math.cos(ang+.4),my-as*Math.sin(ang+.4));ctx.closePath();ctx.fillStyle=col;ctx.fill();if(e.type==='as'&&e.stepOrder){ctx.font=`700 ${Math.max(7,9/gScale)}px DM Mono,monospace`;ctx.fillStyle='rgba(196,122,40,.85)';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(e.stepOrder,mx,my-11/gScale);}}
     });
     // 연결 모드: 시작 노드에서 미리보기 링 표시
     if(gMode==='connect'&&gConnectSrc){
@@ -2118,6 +2072,16 @@ function runGraphLoop(cv){
       if(n.sel){ctx.strokeStyle='#fff';ctx.lineWidth=2/gScale;ctx.stroke();}
       const fs=Math.max(7,Math.min(11,n.r*.55));ctx.font=`700 ${fs}px Noto Sans KR,sans-serif`;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(n.label,n.x,n.y);
       if(n.type==='algo'){ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.strokeStyle=hex2rgba('#fff',.35);ctx.lineWidth=1.5/gScale;ctx.stroke();}
+      if(n.type==='step'){
+        // 단계 번호 배지 (좌상단 작은 원)
+        const bx=n.x-n.r+3,by=n.y-n.r+3,br=6/gScale*Math.min(gScale,1.2);
+        ctx.beginPath();ctx.arc(n.x-n.r*.5,n.y-n.r*.5,Math.max(4,5/gScale),0,Math.PI*2);
+        ctx.fillStyle='rgba(255,255,255,.9)';ctx.fill();
+        ctx.font=`700 ${Math.max(5,6/gScale)}px DM Mono,monospace`;ctx.fillStyle='#c47a28';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(n.stepOrder,n.x-n.r*.5,n.y-n.r*.5);
+        // 점선 테두리
+        ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.strokeStyle='rgba(196,122,40,.5)';ctx.lineWidth=1/gScale;ctx.setLineDash([2,2]);ctx.stroke();ctx.setLineDash([]);
+      }
     });
     ctx.restore();
   }
@@ -2207,7 +2171,7 @@ function bindGraphEvents(cv){
   let touches=[];
   cv.ontouchstart=e=>{e.preventDefault();touches=[...e.touches];if(touches.length===2){gPinchStart=Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY);gDrag=null;gPan=false;return;}const{x,y}=worldXY(touches[0].clientX,touches[0].clientY);const n=findNode(x,y);if(n){gNodes.forEach(nd=>nd.sel=false);n.sel=true;if(gMode==='move')gDrag=n;showNodeInfo(n);}else{gPan=true;gPanStart={x:touches[0].clientX,y:touches[0].clientY};gPanOff={x:gOffX,y:gOffY};}};
   cv.ontouchmove=e=>{e.preventDefault();const ts=[...e.touches];if(ts.length===2){const d=Math.hypot(ts[0].clientX-ts[1].clientX,ts[0].clientY-ts[1].clientY);const factor=d/gPinchStart;const r=cv.getBoundingClientRect();const mx=(ts[0].clientX+ts[1].clientX)/2-r.left,my=(ts[0].clientY+ts[1].clientY)/2-r.top;const newScale=Math.max(.15,Math.min(5,gScale*factor));gOffX=mx-(mx-gOffX)*(newScale/gScale);gOffY=my-(my-gOffY)*(newScale/gScale);gScale=newScale;gPinchStart=d;updateZoomLabel();return;}if(gDrag){const{x,y}=worldXY(ts[0].clientX,ts[0].clientY);gDrag.x=x;gDrag.y=y;gPhysicsTick=9999;}else if(gPan){gOffX=gPanOff.x+(ts[0].clientX-gPanStart.x);gOffY=gPanOff.y+(ts[0].clientY-gPanStart.y);}};
-  cv.ontouchend=e=>{if(e.touches.length<2)gPinchStart=0;if(!e.touches.length){gDrag=null;gPan=false;}};
+  cv.ontouchend=e=>{if(e.touches.length<2){gPinchStart=0;}if(!e.touches.length){gDrag=null;gPan=false;gConnectSrc=null;}};
 }
 function updateZoomLabel(){document.getElementById('zoom-label').textContent=Math.round(gScale*100)+'%';}
 function graphCenter(){gOffX=0;gOffY=0;gScale=1;updateZoomLabel();}
@@ -2216,6 +2180,24 @@ function graphZoomOut(){const ns=Math.max(.15,gScale/1.3);gOffX=gW/2-(gW/2-gOffX
 function graphReset(){if(rafId){cancelAnimationFrame(rafId);rafId=null;}renderGraph();}
 function showNodeInfo(n){
   const panel=document.getElementById('ginfo-panel');
+  if(n.type==='step'){
+    const a=S.algorithms.find(x=>x.id===n.algoId);if(!a)return;
+    const si=n.stepOrder-1;const s=a.steps[si];if(!s)return;
+    const blocks=S.blocks.filter(b=>(s.blockIds||[]).includes(b.id));
+    panel.innerHTML=`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-shrink:0">
+      <span style="font-size:10px;font-family:DM Mono,monospace;color:#c47a28">STEP ${s.order}</span>
+      <span style="font-size:12px;font-weight:700;color:var(--txt1)">${esc(s.title)}</span>
+      <span onclick="document.getElementById('ginfo-panel').innerHTML='';requestAnimationFrame(()=>{const cv=document.getElementById('gcanvas');if(cv)resizeCanvas(cv);})" style="cursor:pointer;color:var(--txt3);font-size:16px;line-height:1;padding:0 4px;margin-left:auto">✕</span>
+    </div>
+    <div style="font-size:11px;color:var(--txt3);margin-bottom:8px">← ${esc(a.title)}</div>
+    <div style="font-size:11px;color:var(--txt3);margin-bottom:6px;font-family:DM Mono,monospace">연결된 블록 ${blocks.length}개</div>
+    ${blocks.length?`<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px">${blocks.map(b=>`<div style="font-size:12px;background:rgba(224,133,60,.08);border:1px solid rgba(224,133,60,.2);border-radius:6px;padding:5px 9px;color:var(--txt2)">↗ ${esc(b.content.slice(0,50))}</div>`).join('')}</div>`:''}
+    <button onclick="openStepLinker('${a.id}',${si})" style="padding:6px 12px;background:var(--sur3);color:var(--txt2);border:1px solid var(--bdr);border-radius:7px;font-size:12px;cursor:pointer">＋ Block 연결</button>`;
+    panel.style.display='flex';
+    requestAnimationFrame(()=>{const cv=document.getElementById('gcanvas');if(cv)resizeCanvas(cv);});
+    return;
+  }
   if(n.type==='block'){
     const b=S.blocks.find(x=>x.id===n.id);if(!b)return;
     const g=S.groups.find(x=>x.id===b.groupId);
@@ -2233,7 +2215,7 @@ function showNodeInfo(n){
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:120px">
         <span style="font-size:11px;color:var(--txt3);font-family:DM Mono,monospace">TAGS</span>
-        <input id="gnode-tags-edit" type="text" value="${esc((b.tags||[]).join(', '))}" placeholder="태그, 콤마 구분" style="flex:1;background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;padding:5px 8px;color:var(--txt);font-size:12px;outline:none">
+        <input id="gnode-tags-edit" type="text" value="${esc((b.tags||[]).join(', '))}" placeholder="태그, 콤마 구분" style="flex:1;background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;padding:5px 8px;color:var(--txt);font-size:16px;outline:none">
       </div>
       <select id="gnode-group-edit" style="background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;padding:5px 8px;color:var(--txt);font-size:12px;outline:none;cursor:pointer">
         <option value="">그룹 없음</option>
@@ -2268,7 +2250,7 @@ function showNodeInfo(n){
       <span style="font-size:11px;font-family:DM Mono,monospace;color:#e0853c">⚙ ALGORITHM</span>
       <span onclick="document.getElementById('ginfo-panel').innerHTML='';requestAnimationFrame(()=>{const cv=document.getElementById('gcanvas');if(cv)resizeCanvas(cv);})" style="cursor:pointer;color:var(--txt3);font-size:16px;line-height:1;padding:0 4px;margin-left:auto">✕</span>
     </div>
-    <input id="gnode-algo-title" type="text" value="${esc(a.title)}" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;color:var(--txt);font-size:14px;font-weight:600;outline:none;margin-bottom:8px">
+    <input id="gnode-algo-title" type="text" value="${esc(a.title)}" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;color:var(--txt);font-size:16px;font-weight:600;outline:none;margin-bottom:8px">
     <div style="font-size:11px;color:var(--txt3);margin-bottom:10px">${a.steps.length}단계 · 블록 ${[...new Set(a.steps.flatMap(s=>s.blockIds||[]))].length}개 연결</div>
     <div style="background:var(--sur2);border:1px solid var(--bdr);border-radius:10px;padding:10px 12px;margin-bottom:10px;max-height:240px;overflow-y:auto">
       ${stepsHtml}
@@ -2301,8 +2283,9 @@ function gNodeSaveBlock(blockId){
   const n=gNodes.find(x=>x.id===blockId);
   if(n){n.label=b.content.slice(0,8);n.color=S.groups.find(g=>g.id===b.groupId)?.color||'#d4a853';n.groupId=b.groupId;}
   const panel=document.getElementById('ginfo-panel');
+  panel.style.display='flex';
   panel.innerHTML=`<span style="color:var(--acc)">✓ 저장됨</span> — ${esc(b.content.slice(0,40))}`;
-  setTimeout(()=>{if(panel.textContent.startsWith('✓'))panel.innerHTML='';},2000);
+  setTimeout(()=>{if(panel.textContent.startsWith('✓')){panel.innerHTML='';panel.style.display='none';requestAnimationFrame(()=>{const cv=document.getElementById('gcanvas');if(cv)resizeCanvas(cv);});}},2000);
 }
 function gNodeSaveAlgo(algoId){
   const a=S.algorithms.find(x=>x.id===algoId);if(!a)return;
